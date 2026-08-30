@@ -5,14 +5,14 @@ defineProps<{ title: string; back?: boolean }>();
 
 function goBack() {
   const pages = getCurrentPages();
-  if (pages.length > 1) uni.navigateBack();
+  if (pages.length > 1) uni.navigateBack({ success() {} });
   else uni.reLaunch({ url: "/pages/home/index" });
 }
 </script>
 
 <template>
   <view class="page-header">
-    <button v-if="back" class="icon-btn" aria-label="返回" @click="goBack">
+    <button v-if="back" class="icon-btn" aria-label="返回" title="返回" @click="goBack">
       <ArrowLeft :size="22" />
     </button>
     <text class="page-header__title">{{ title }}</text>
@@ -30,9 +30,14 @@ function goBack() {
 }
 
 .page-header .icon-btn {
-  border: 1px solid #dfe6e2;
+  border: 1px solid var(--bud-color-line);
   background: #ffffff;
-  box-shadow: 0 2px 8px rgba(24, 33, 30, 0.04);
+  box-shadow: var(--bud-shadow-sm);
+}
+
+.page-header .icon-btn:active {
+  color: var(--bud-color-primary);
+  background: var(--bud-color-primary-soft);
 }
 
 .page-header__title {

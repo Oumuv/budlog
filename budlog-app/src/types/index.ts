@@ -64,6 +64,21 @@ export interface FeedingInput {
   note?: string;
 }
 
+export interface MilkStorageRecord {
+  id: number;
+  clientRequestId: string;
+  storedAt: string;
+  amountMl: number;
+  note?: string;
+}
+
+export interface MilkStorageInput {
+  clientRequestId: string;
+  storedAt: string;
+  amountMl: number;
+  note?: string;
+}
+
 export interface DiaperRecord {
   id: number;
   clientRequestId: string;
@@ -111,13 +126,15 @@ export interface DailySummary {
   feedingCount: number;
   bottleAmountMl: number;
   directFeedingMinutes: number;
+  milkStorageCount: number;
+  storedMilkAmountMl: number;
   peeCount: number;
   poopCount: number;
 }
 
 export interface TimelineItem {
   id: number;
-  category: "FEEDING" | "DIAPER" | "TASK";
+  category: "FEEDING" | "DIAPER" | "MILK_STORAGE" | "TASK";
   recordType: string;
   eventTime: string;
   title: string;
@@ -157,4 +174,3 @@ export interface PageResult<T> {
   totalElements: number;
   totalPages: number;
 }
-

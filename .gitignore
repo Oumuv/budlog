@@ -13,3 +13,4 @@ deploy/h5/
 # Editor and operating-system files
 .DS_Store
 *.log
+.*

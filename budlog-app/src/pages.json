@@ -12,13 +12,14 @@
     { "path": "pages/tasks/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/settings/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/feeding/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/milk-storage/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/diaper/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/task-edit/index", "style": { "navigationStyle": "custom" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "Budlog",
-    "navigationBarBackgroundColor": "#F4F7F5",
-    "backgroundColor": "#F4F7F5"
+    "navigationBarBackgroundColor": "#FFF8F7",
+    "backgroundColor": "#FFF8F7"
   }
 }

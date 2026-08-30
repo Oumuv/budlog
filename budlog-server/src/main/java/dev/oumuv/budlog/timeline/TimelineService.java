@@ -11,6 +11,8 @@ import dev.oumuv.budlog.diaper.DiaperType;
 import dev.oumuv.budlog.feeding.FeedingRecord;
 import dev.oumuv.budlog.feeding.FeedingService;
 import dev.oumuv.budlog.feeding.FeedingType;
+import dev.oumuv.budlog.milkstorage.MilkStorageRecord;
+import dev.oumuv.budlog.milkstorage.MilkStorageService;
 import dev.oumuv.budlog.task.TaskService;
 import dev.oumuv.budlog.task.TodoTask;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ public class TimelineService {
     private final BabyService babyService;
     private final FeedingService feedingService;
     private final DiaperService diaperService;
+    private final MilkStorageService milkStorageService;
     private final TaskService taskService;
     private final TimeService timeService;
 
@@ -35,11 +38,13 @@ public class TimelineService {
             BabyService babyService,
             FeedingService feedingService,
             DiaperService diaperService,
+            MilkStorageService milkStorageService,
             TaskService taskService,
             TimeService timeService) {
         this.babyService = babyService;
         this.feedingService = feedingService;
         this.diaperService = diaperService;
+        this.milkStorageService = milkStorageService;
         this.taskService = taskService;
         this.timeService = timeService;
     }
@@ -50,6 +55,8 @@ public class TimelineService {
         TimeRange range = timeService.day(resolvedDate, baby.getTimezone());
         List<FeedingRecord> feedings = feedingService.recordsBetween(baby.getId(), range.getStart(), range.getEnd());
         List<DiaperRecord> diapers = diaperService.recordsBetween(baby.getId(), range.getStart(), range.getEnd());
+        List<MilkStorageRecord> milkStorages = milkStorageService.recordsBetween(
+                baby.getId(), range.getStart(), range.getEnd());
         List<TodoTask> tasks = taskService.completedBetween(baby.getId(), range.getStart(), range.getEnd());
 
         List<TimelineItemResponse> items = new ArrayList<TimelineItemResponse>();
@@ -58,6 +65,9 @@ public class TimelineService {
         }
         for (DiaperRecord record : diapers) {
             items.add(diaperItem(record));
+        }
+        for (MilkStorageRecord record : milkStorages) {
+            items.add(milkStorageItem(record));
         }
         for (TodoTask task : tasks) {
             items.add(TimelineItemResponse.builder()
@@ -70,11 +80,15 @@ public class TimelineService {
                     .build());
         }
         items.sort(Comparator.comparing(TimelineItemResponse::getEventTime).reversed());
-        return new TimelineResponse(resolvedDate, summary(feedings, diapers), items);
+        return new TimelineResponse(resolvedDate, summary(feedings, diapers, milkStorages), items);
     }
 
-    private DailySummaryResponse summary(List<FeedingRecord> feedings, List<DiaperRecord> diapers) {
+    private DailySummaryResponse summary(
+            List<FeedingRecord> feedings,
+            List<DiaperRecord> diapers,
+            List<MilkStorageRecord> milkStorages) {
         BigDecimal bottleAmount = BigDecimal.ZERO;
+        BigDecimal storedMilkAmount = BigDecimal.ZERO;
         long directMinutes = 0;
         for (FeedingRecord record : feedings) {
             if (record.getFeedingType() != FeedingType.BREAST_DIRECT && record.getAmountMl() != null) {
@@ -83,6 +97,9 @@ public class TimelineService {
             if (record.getFeedingType() == FeedingType.BREAST_DIRECT && record.getEndTime() != null) {
                 directMinutes += Math.max(0, Duration.between(record.getStartTime(), record.getEndTime()).toMinutes());
             }
+        }
+        for (MilkStorageRecord record : milkStorages) {
+            storedMilkAmount = storedMilkAmount.add(record.getAmountMl());
         }
         int pee = 0;
         int poop = 0;
@@ -94,7 +111,14 @@ public class TimelineService {
                 poop++;
             }
         }
-        return new DailySummaryResponse(feedings.size(), bottleAmount, directMinutes, pee, poop);
+        return new DailySummaryResponse(
+                feedings.size(),
+                bottleAmount,
+                directMinutes,
+                milkStorages.size(),
+                storedMilkAmount,
+                pee,
+                poop);
     }
 
     private TimelineItemResponse feedingItem(FeedingRecord record) {
@@ -133,6 +157,17 @@ public class TimelineService {
                 .eventTime(record.getRecordTime())
                 .title(title)
                 .subtitle(record.getNote())
+                .build();
+    }
+
+    private TimelineItemResponse milkStorageItem(MilkStorageRecord record) {
+        return TimelineItemResponse.builder()
+                .id(record.getId())
+                .category("MILK_STORAGE")
+                .recordType("STORED")
+                .eventTime(record.getStoredAt())
+                .title("存奶")
+                .subtitle(record.getAmountMl().stripTrailingZeros().toPlainString() + " ml")
                 .build();
     }
 }

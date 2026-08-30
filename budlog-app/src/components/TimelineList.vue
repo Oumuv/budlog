@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckCircle2, ClipboardList, Droplets, Milk } from "lucide-vue-next";
+import { CheckCircle2, ClipboardList, Droplets, Milk, PackagePlus } from "lucide-vue-next";
 import type { TimelineItem } from "../types";
 import { formatTime } from "../utils/date";
 
@@ -19,6 +19,7 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
       <view class="timeline__icon" :class="`timeline__icon--${item.category.toLowerCase()}`">
         <Milk v-if="item.category === 'FEEDING'" :size="18" />
         <Droplets v-else-if="item.category === 'DIAPER'" :size="18" />
+        <PackagePlus v-else-if="item.category === 'MILK_STORAGE'" :size="18" />
         <CheckCircle2 v-else :size="18" />
       </view>
       <view class="timeline__body">
@@ -31,7 +32,7 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
   <view v-else class="state-panel surface timeline-empty">
     <view class="state-panel__icon"><ClipboardList :size="21" /></view>
     <text class="state-panel__title">还没有记录</text>
-    <text class="state-panel__copy">喂奶、尿便和完成的任务会按时间显示在这里</text>
+    <text class="state-panel__copy">喂奶、存奶、尿便和完成的任务会按时间显示在这里</text>
   </view>
 </template>
 
@@ -47,7 +48,7 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
   align-items: center;
   min-height: 68px;
   padding: 11px 13px;
-  border-bottom: 1px solid #edf1ef;
+  border-bottom: 1px solid var(--bud-color-line-soft);
 }
 
 .timeline__row:last-child {
@@ -55,7 +56,7 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
 }
 
 .timeline__row--action:active {
-  background: #f3f7f5;
+  background: #fff7f8;
 }
 
 .timeline__icon {
@@ -68,18 +69,23 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
 }
 
 .timeline__icon--feeding {
-  color: #ad4e46;
-  background: #fae9e5;
+  color: var(--bud-color-coral);
+  background: var(--bud-color-coral-soft);
 }
 
 .timeline__icon--diaper {
-  color: #176e78;
-  background: #e0f0f1;
+  color: var(--bud-color-cyan);
+  background: var(--bud-color-cyan-soft);
+}
+
+.timeline__icon--milk_storage {
+  color: var(--bud-color-sage);
+  background: var(--bud-color-sage-soft);
 }
 
 .timeline__icon--task {
-  color: #785c1a;
-  background: #f7efce;
+  color: var(--bud-color-gold);
+  background: var(--bud-color-gold-soft);
 }
 
 .timeline__body {
@@ -100,13 +106,13 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
 }
 
 .timeline__subtitle {
-  color: #68756f;
+  color: var(--bud-color-muted);
   font-size: 13px;
   line-height: 19px;
 }
 
 .timeline__time {
-  color: #62716b;
+  color: var(--bud-color-muted);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }

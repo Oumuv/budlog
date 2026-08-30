@@ -1,0 +1,33 @@
+{
+  "id": "/",
+  "name": "Budlog 家庭育儿日记",
+  "short_name": "Budlog",
+  "description": "家庭内部使用的育儿日记",
+  "lang": "zh-CN",
+  "start_url": "/#/pages/home/index",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fff8f7",
+  "theme_color": "#b94b5d",
+  "categories": ["lifestyle", "health"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

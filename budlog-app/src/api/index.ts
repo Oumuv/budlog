@@ -7,6 +7,8 @@ import type {
   DiaperRecord,
   FeedingInput,
   FeedingRecord,
+  MilkStorageInput,
+  MilkStorageRecord,
   Milestone,
   MilestoneInput,
   PageResult,
@@ -41,6 +43,14 @@ export const api = {
   updateFeeding: (id: number, data: FeedingInput) =>
     apiRequest<FeedingRecord>(`/feedings/${id}`, { method: "PUT", data }),
   deleteFeeding: (id: number) => apiRequest<void>(`/feedings/${id}`, { method: "DELETE" }),
+  milkStorages: (from?: string, to?: string) =>
+    apiRequest<PageResult<MilkStorageRecord>>(`/milk-storage-records${query({ from, to, page: 0, size: 100 })}`),
+  milkStorage: (id: number) => apiRequest<MilkStorageRecord>(`/milk-storage-records/${id}`),
+  createMilkStorage: (data: MilkStorageInput) =>
+    apiRequest<MilkStorageRecord>("/milk-storage-records", { method: "POST", data }),
+  updateMilkStorage: (id: number, data: MilkStorageInput) =>
+    apiRequest<MilkStorageRecord>(`/milk-storage-records/${id}`, { method: "PUT", data }),
+  deleteMilkStorage: (id: number) => apiRequest<void>(`/milk-storage-records/${id}`, { method: "DELETE" }),
   diapers: (from?: string, to?: string) =>
     apiRequest<PageResult<DiaperRecord>>(`/diapers${query({ from, to, page: 0, size: 100 })}`),
   diaper: (id: number) => apiRequest<DiaperRecord>(`/diapers/${id}`),

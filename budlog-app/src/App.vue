@@ -1,53 +1,75 @@
 <script setup lang="ts">
 import { onHide, onLaunch, onShow } from "@dcloudio/uni-app";
+import { initializePwa } from "./utils/pwa";
 import { startReminderLoop, stopReminderLoop } from "./utils/reminders";
 
-onLaunch(() => undefined);
+onLaunch(() => initializePwa());
 onShow(() => startReminderLoop());
 onHide(() => stopReminderLoop());
 </script>
 
 <style lang="scss">
-page {
-  --bud-color-ink: #18211e;
-  --bud-color-body: #40504a;
-  --bud-color-muted: #68756f;
-  --bud-color-line: #dfe6e2;
-  --bud-color-line-soft: #edf1ef;
-  --bud-color-canvas: #f4f7f5;
+page,
+body {
+  --bud-color-ink: #30292b;
+  --bud-color-body: #5c4f52;
+  --bud-color-muted: #7d6c6f;
+  --bud-color-line: #eadcdd;
+  --bud-color-line-soft: #f4ebea;
+  --bud-color-canvas: #fff8f7;
   --bud-color-surface: #ffffff;
-  --bud-color-primary: #216b59;
-  --bud-color-primary-dark: #174c40;
-  --bud-color-primary-soft: #e1f0ea;
-  --bud-color-coral: #ba564d;
-  --bud-color-coral-soft: #fae9e5;
-  --bud-color-cyan: #176e78;
-  --bud-color-cyan-soft: #e0f0f1;
-  --bud-color-gold: #9b721c;
-  --bud-color-gold-soft: #f7efce;
-  --bud-shadow-sm: 0 2px 10px rgba(24, 33, 30, 0.05);
-  --bud-shadow-md: 0 8px 24px rgba(24, 33, 30, 0.08);
+  --bud-color-primary: #b94b5d;
+  --bud-color-primary-dark: #873342;
+  --bud-color-primary-soft: #fbe7eb;
+  --bud-color-coral: #c5655e;
+  --bud-color-coral-soft: #fce9e6;
+  --bud-color-sage: #497c69;
+  --bud-color-sage-soft: #e4f1eb;
+  --bud-color-cyan: #39798b;
+  --bud-color-cyan-soft: #e3f1f4;
+  --bud-color-gold: #9a6c1c;
+  --bud-color-gold-soft: #fff1cf;
+  --bud-shadow-sm: 0 3px 12px rgba(112, 70, 76, 0.07);
+  --bud-shadow-md: 0 12px 32px rgba(112, 70, 76, 0.12);
   --wot-color-theme: var(--bud-color-primary);
-  --wot-color-success: #2f8069;
-  --wot-color-warning: #b47c27;
-  --wot-color-danger: var(--bud-color-coral);
+  --wot-color-success: var(--bud-color-sage);
+  --wot-color-warning: var(--bud-color-gold);
+  --wot-color-danger: #b34747;
   --wot-color-title: var(--bud-color-ink);
   --wot-color-content: var(--bud-color-body);
-  --wot-color-secondary: #62716b;
+  --wot-color-secondary: #746568;
   --wot-color-aid: var(--bud-color-muted);
-  --wot-color-tip: #9ca6a2;
-  --wot-color-border: #cdd8d2;
+  --wot-color-tip: #aa999c;
+  --wot-color-border: #dfcecf;
   --wot-color-border-light: var(--bud-color-line-soft);
   --wot-color-bg: var(--bud-color-canvas);
+  --wot-button-primary-bg-color: var(--bud-color-primary);
+  --wot-calendar-active-color: var(--bud-color-primary);
+  --wot-calendar-range-color: var(--bud-color-primary-soft);
+  --wot-picker-toolbar-finish-color: var(--bud-color-primary);
+  --wot-switch-active-color: var(--bud-color-primary);
   --wot-button-medium-height: 40px;
-  --wot-button-medium-radius: 6px;
+  --wot-button-medium-radius: 10px;
   --wot-button-large-height: 48px;
-  --wot-button-large-radius: 8px;
+  --wot-button-large-radius: 12px;
+  --wot-button-info-bg-color: #f7efef;
+  --wot-button-info-color: var(--bud-color-body);
+  --wot-button-info-plain-border-color: var(--bud-color-line);
+  --wot-button-info-plain-normal-color: var(--bud-color-body);
   --wot-input-inner-height: 46px;
   --wot-input-padding: 12px 13px;
   --wot-input-bg: var(--bud-color-surface);
   --wot-textarea-bg: var(--bud-color-surface);
-  --wot-segmented-radius: 7px;
+  --wot-segmented-radius: 10px;
+  --wot-cell-tap-bg: var(--bud-color-primary-soft);
+  --wot-input-number-height: 42px;
+  --wot-input-number-btn-width: 44px;
+  --wot-input-number-input-width: 76px;
+  --wot-input-number-radius: 10px;
+  --wot-input-number-fs: 17px;
+  --wot-input-number-icon-size: 18px;
+  --wot-input-number-icon-color: var(--bud-color-primary-dark);
+  --wot-input-number-border-color: var(--bud-color-line);
   min-height: 100%;
   background: var(--bud-color-canvas);
   color: var(--bud-color-ink);
@@ -118,6 +140,30 @@ button::after {
   box-shadow: var(--bud-shadow-sm);
 }
 
+.wd-button {
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.wd-button.is-round {
+  border-radius: 12px !important;
+}
+
+.wd-button.is-primary:not(.is-plain) {
+  box-shadow: 0 7px 16px rgba(185, 75, 93, 0.22);
+}
+
+.wd-button.is-error.is-plain {
+  background: #fffafa;
+}
+
+.wd-button__text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -168,14 +214,16 @@ button::after {
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 7px;
-  color: #355149;
+  border-radius: 50%;
+  color: var(--bud-color-body);
   background: transparent;
+  transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
 }
 
 .icon-btn:active,
 .btn:active {
-  opacity: 0.78;
+  opacity: 0.86;
+  transform: scale(0.95);
 }
 
 .field {
@@ -194,8 +242,8 @@ button::after {
   width: 100%;
   min-height: 46px;
   padding: 11px 12px;
-  border: 1px solid #cdd8d2;
-  border-radius: 7px;
+  border: 1px solid var(--wot-color-border);
+  border-radius: 10px;
   color: var(--bud-color-ink);
   background: var(--bud-color-surface);
   font-size: 16px;
@@ -222,9 +270,9 @@ textarea.field__control {
   grid-auto-flow: column;
   min-height: 44px;
   padding: 3px;
-  border: 1px solid #d4ddd8;
-  border-radius: 7px;
-  background: #e9efec;
+  border: 1px solid var(--bud-color-line);
+  border-radius: 10px;
+  background: #f6eeee;
 }
 
 .segmented__item {
@@ -233,8 +281,8 @@ textarea.field__control {
   justify-content: center;
   min-width: 0;
   padding: 0 8px;
-  border-radius: 5px;
-  color: #56635e;
+  border-radius: 8px;
+  color: var(--bud-color-muted);
   font-size: 14px;
   font-weight: 650;
 }
@@ -276,7 +324,7 @@ textarea.field__control {
   height: 44px;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 50%;
   color: var(--bud-color-primary);
   background: var(--bud-color-primary-soft);
 }
@@ -300,9 +348,22 @@ textarea.field__control {
 
 .wot-control.wd-input,
 .wot-control.wd-textarea {
-  border: 1px solid #cdd8d2;
-  border-radius: 7px;
+  border: 1px solid var(--wot-color-border);
+  border-radius: 10px;
   background: var(--bud-color-surface);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.wot-control.wd-input {
+  box-sizing: border-box;
+  min-height: 46px;
+  padding: 10px 12px;
+}
+
+.wot-control.wd-input:focus-within,
+.wot-control.wd-textarea:focus-within {
+  border-color: rgba(185, 75, 93, 0.72);
+  box-shadow: 0 0 0 3px rgba(185, 75, 93, 0.1);
 }
 
 .wot-control.wd-input.is-error,
@@ -323,6 +384,48 @@ textarea.field__control {
 .wot-action-row > * {
   min-width: 0;
   flex: 1;
+}
+
+.shortcut-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.shortcut-chip {
+  display: inline-flex;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 12px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--bud-color-line);
+  border-radius: 17px;
+  color: var(--bud-color-body);
+  background: #fffdfd;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 18px;
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+.shortcut-chip:active {
+  transform: scale(0.96);
+}
+
+.shortcut-chip--active {
+  border-color: rgba(185, 75, 93, 0.38);
+  color: var(--bud-color-primary-dark);
+  background: var(--bud-color-primary-soft);
+}
+
+.field__hint {
+  display: block;
+  margin-top: 7px;
+  color: var(--bud-color-muted);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 @media (min-width: 760px) {

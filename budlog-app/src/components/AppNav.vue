@@ -24,8 +24,8 @@ function go(event: { value: string | number }) {
     safe-area-inset-bottom
     :z-index="10"
     :bordered="false"
-    active-color="#216b59"
-    inactive-color="#7b8782"
+    active-color="#b94b5d"
+    inactive-color="#7d6c6f"
     custom-class="bud-tabbar"
     @change="go"
   >
@@ -49,9 +49,9 @@ function go(event: { value: string | number }) {
   --wot-tabbar-item-title-line-height: 16px;
   padding-right: max(8px, calc((100vw - 740px) / 2));
   padding-left: max(8px, calc((100vw - 740px) / 2));
-  border-top: 1px solid #dfe6e2;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 -4px 18px rgba(24, 33, 30, 0.05);
+  border-top: 1px solid var(--bud-color-line);
+  background: rgba(255, 253, 253, 0.97);
+  box-shadow: 0 -5px 20px rgba(112, 70, 76, 0.08);
   backdrop-filter: blur(14px);
 }
 </style>
