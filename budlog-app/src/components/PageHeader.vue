@@ -6,7 +6,7 @@ defineProps<{ title: string; back?: boolean }>();
 function goBack() {
   const pages = getCurrentPages();
   if (pages.length > 1) uni.navigateBack();
-  else uni.reLaunch({ url: "/pages/home/home" });
+  else uni.reLaunch({ url: "/pages/home/index" });
 }
 </script>
 
@@ -26,14 +26,20 @@ function goBack() {
   grid-template-columns: 40px minmax(0, 1fr) 40px;
   align-items: center;
   min-height: 48px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
+}
+
+.page-header .icon-btn {
+  border: 1px solid #dfe6e2;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(24, 33, 30, 0.04);
 }
 
 .page-header__title {
   grid-column: 2;
   overflow: hidden;
   font-size: 18px;
-  font-weight: 750;
+  font-weight: 760;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -44,4 +50,3 @@ function goBack() {
   justify-content: flex-end;
 }
 </style>
-

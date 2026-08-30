@@ -95,27 +95,20 @@ APP_ACCESS_PASSWORD=<生产家庭访问密码>
 
 不要把 `.env`、数据库备份或真实密码提交到 Git。
 
-## 5. 构建镜像
-
-开发环境：
+## 5. 生成部署产物
 
 ```sh
-./deploy/build.sh dev
-```
-
-生产环境：
-
-```sh
-./deploy/build.sh prod
+./deploy/build.sh
 ```
 
 构建脚本依次执行以下步骤：
 
-1. 校验对应 Compose 配置和 `.env` 必填项。
-2. 通过 SDKMAN 切换到 JDK `8.0.361-orcl`。
-3. 使用指定 Maven 3.6.0 和本地仓库离线打包后端，并跳过测试。
-4. 执行前端 TypeScript 类型检查和 H5 构建。
-5. 构建 `budlog-server:<标签>` 与 `budlog-web:<标签>` 镜像。
+1. 通过 SDKMAN 切换到 JDK `8.0.361-orcl`。
+2. 使用指定 Maven 3.6.0 和本地仓库离线打包后端，并跳过测试。
+3. 执行前端 TypeScript 类型检查和 H5 构建。
+4. 将 Jar 和 H5 同步到 `deploy/budlog-server.jar` 与 `deploy/h5/`。
+
+Docker 镜像不再由 `build.sh` 生成。生产环境由 `start.sh` 在部署服务器构建镜像并启动。
 
 可按需覆盖本机工具位置：
 
@@ -123,23 +116,23 @@ APP_ACCESS_PASSWORD=<生产家庭访问密码>
 BUDLOG_JAVA_VERSION=<SDKMAN版本> \
 MAVEN_HOME=<Maven目录> \
 MAVEN_REPO_LOCAL=<Maven本地仓库> \
-./deploy/build.sh dev
+./deploy/build.sh
 ```
 
-`MAVEN_BIN` 可单独指定 Maven 可执行文件，`BUDLOG_ENV_FILE` 可指定另一份环境变量文件。
+`MAVEN_BIN` 可单独指定 Maven 可执行文件。
 
 ## 6. 启动与日常操作
 
 启动开发环境：
 
 ```sh
-./deploy/compose.sh dev up -d
+./deploy/compose.sh dev up -d --build
 ```
 
 启动生产环境：
 
 ```sh
-./deploy/compose.sh prod up -d
+./deploy/start.sh
 ```
 
 查看状态：

@@ -1,19 +1,24 @@
 {
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^wd-(.*)": "wot-design-uni/components/wd-$1/wd-$1.vue"
+    }
+  },
   "pages": [
-    { "path": "pages/access/access", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/home/home", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/records/records", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/tasks/tasks", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/settings/settings", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/feeding/feeding", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/diaper/diaper", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/task-edit/task-edit", "style": { "navigationStyle": "custom" } }
+    { "path": "pages/access/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/home/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/records/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/tasks/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/settings/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/feeding/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/diaper/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/task-edit/index", "style": { "navigationStyle": "custom" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "Budlog",
-    "navigationBarBackgroundColor": "#F4F6F5",
-    "backgroundColor": "#F4F6F5"
+    "navigationBarBackgroundColor": "#F4F7F5",
+    "backgroundColor": "#F4F7F5"
   }
 }
-

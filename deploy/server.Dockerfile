@@ -4,7 +4,6 @@ RUN groupadd --system budlog \
     && useradd --system --uid 10001 --gid budlog --home-dir /app --shell /usr/sbin/nologin budlog
 
 WORKDIR /app
-COPY --chown=budlog:budlog budlog-server/target/budlog-server.jar /app/budlog-server.jar
 
 USER budlog
 EXPOSE 8080

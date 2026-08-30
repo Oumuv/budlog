@@ -129,6 +129,12 @@ export function formatDateTime(value?: string, timezone = getAppTimezone()): str
   return `${pad(parts.month)}-${pad(parts.day)} ${pad(parts.hour)}:${pad(parts.minute)}`;
 }
 
+export function formatDate(value?: string, timezone = getAppTimezone()): string {
+  if (!value) return "--";
+  const parts = zonedParts(new Date(value), timezone);
+  return `${pad(parts.month)}-${pad(parts.day)}`;
+}
+
 export function formatTime(value?: string, timezone = getAppTimezone()): string {
   if (!value) return "--:--";
   const parts = zonedParts(new Date(value), timezone);

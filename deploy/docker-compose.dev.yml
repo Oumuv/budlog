@@ -4,9 +4,16 @@ services:
   server:
     image: budlog-server:${BUDLOG_IMAGE_TAG:-local}
     build:
-      context: ..
-      dockerfile: deploy/server.Dockerfile
+      context: .
+      dockerfile: server.Dockerfile
     restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ./budlog-server.jar
+        target: /app/budlog-server.jar
+        read_only: true
+        bind:
+          create_host_path: false
     environment:
       SPRING_PROFILES_ACTIVE: dev
       POSTGRESQL_HOST: ${POSTGRESQL_HOST:?POSTGRESQL_HOST is required}
@@ -30,14 +37,21 @@ services:
   web:
     image: budlog-web:${BUDLOG_IMAGE_TAG:-local}
     build:
-      context: ..
-      dockerfile: deploy/web.Dockerfile
+      context: .
+      dockerfile: web.Dockerfile
     restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ./h5
+        target: /usr/share/nginx/html
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       server:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${BUDLOG_DEV_WEB_PORT:-5174}:80"
+      - "${BUDLOG_DEV_WEB_PORT:-5174}:80"
     healthcheck:
       test: ["CMD-SHELL", "nginx -t >/dev/null 2>&1 && test -s /usr/share/nginx/html/index.html"]
       interval: 10s

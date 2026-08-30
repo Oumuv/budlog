@@ -20,6 +20,5 @@ export function clearPassword(): void {
 export function redirectToAccess(): void {
   const pages = getCurrentPages();
   const current = pages.length ? pages[pages.length - 1].route : "";
-  if (current !== "pages/access/access") uni.reLaunch({ url: "/pages/access/access" });
+  if (current !== "pages/access/index") uni.reLaunch({ url: "/pages/access/index" });
 }
-

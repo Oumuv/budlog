@@ -7,6 +7,8 @@ deploy/backups/
 budlog-app/node_modules/
 budlog-app/dist/
 budlog-server/target/
+deploy/budlog-server.jar
+deploy/h5/
 
 # Editor and operating-system files
 .DS_Store

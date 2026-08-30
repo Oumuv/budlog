@@ -1,45 +1,48 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { nowLocalInput } from "../utils/date";
+import { nowLocalInput, toIso, toLocalInput } from "../utils/date";
 
 const props = defineProps<{ modelValue: string }>();
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 
-const normalized = computed(() => props.modelValue || nowLocalInput());
-const datePart = computed(() => normalized.value.slice(0, 10));
-const timePart = computed(() => normalized.value.slice(11, 16));
+const pickerValue = computed({
+  get() {
+    try {
+      return new Date(toIso(props.modelValue || nowLocalInput())).getTime();
+    } catch {
+      return Date.now();
+    }
+  },
+  set(value: string | number) {
+    emit("update:modelValue", toLocalInput(new Date(Number(value)).toISOString()));
+  },
+});
 
-function updateDate(event: { detail: { value: string } }) {
-  emit("update:modelValue", `${event.detail.value}T${timePart.value}`);
-}
-
-function updateTime(event: { detail: { value: string } }) {
-  emit("update:modelValue", `${datePart.value}T${event.detail.value}`);
-}
+const minDate = new Date(2000, 0, 1).getTime();
+const maxDate = new Date(2100, 11, 31, 23, 59).getTime();
 </script>
 
 <template>
-  <view class="date-time-field">
-    <picker mode="date" :value="datePart" @change="updateDate">
-      <view class="field__control date-time-field__control">{{ datePart }}</view>
-    </picker>
-    <picker mode="time" :value="timePart" @change="updateTime">
-      <view class="field__control date-time-field__control">{{ timePart }}</view>
-    </picker>
-  </view>
+  <wd-datetime-picker
+    v-model="pickerValue"
+    type="datetime"
+    title="选择日期和时间"
+    :min-date="minDate"
+    :max-date="maxDate"
+    :z-index="60"
+    root-portal
+    custom-class="date-time-field"
+    custom-cell-class="date-time-field__cell"
+  />
 </template>
 
 <style scoped>
-.date-time-field {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px;
-  gap: 8px;
-}
-
-.date-time-field__control {
-  display: flex;
-  align-items: center;
+:deep(.date-time-field__cell) {
+  min-height: 48px;
+  padding: 0 13px;
+  border: 1px solid #cdd8d2;
+  border-radius: 7px;
+  background: #ffffff;
   font-variant-numeric: tabular-nums;
 }
 </style>
-

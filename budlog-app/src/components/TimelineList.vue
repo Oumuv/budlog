@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckCircle2, Droplets, Milk } from "lucide-vue-next";
+import { CheckCircle2, ClipboardList, Droplets, Milk } from "lucide-vue-next";
 import type { TimelineItem } from "../types";
 import { formatTime } from "../utils/date";
 
@@ -28,7 +28,11 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
       <text class="timeline__time">{{ formatTime(item.eventTime) }}</text>
     </view>
   </view>
-  <view v-else class="empty-state surface">当天暂无记录</view>
+  <view v-else class="state-panel surface timeline-empty">
+    <view class="state-panel__icon"><ClipboardList :size="21" /></view>
+    <text class="state-panel__title">还没有记录</text>
+    <text class="state-panel__copy">喂奶、尿便和完成的任务会按时间显示在这里</text>
+  </view>
 </template>
 
 <style scoped>
@@ -41,9 +45,9 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
   grid-template-columns: 38px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
-  min-height: 64px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #edf0ee;
+  min-height: 68px;
+  padding: 11px 13px;
+  border-bottom: 1px solid #edf1ef;
 }
 
 .timeline__row:last-child {
@@ -51,7 +55,7 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
 }
 
 .timeline__row--action:active {
-  background: #f5f8f6;
+  background: #f3f7f5;
 }
 
 .timeline__icon {
@@ -60,22 +64,22 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
   justify-content: center;
   width: 34px;
   height: 34px;
-  border-radius: 6px;
+  border-radius: 7px;
 }
 
 .timeline__icon--feeding {
-  color: #a64b3f;
-  background: #fbe9e4;
+  color: #ad4e46;
+  background: #fae9e5;
 }
 
 .timeline__icon--diaper {
   color: #176e78;
-  background: #e2f1f2;
+  background: #e0f0f1;
 }
 
 .timeline__icon--task {
-  color: #6a5713;
-  background: #f7efc9;
+  color: #785c1a;
+  background: #f7efce;
 }
 
 .timeline__body {
@@ -96,14 +100,18 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
 }
 
 .timeline__subtitle {
-  color: #74807b;
+  color: #68756f;
   font-size: 13px;
   line-height: 19px;
 }
 
 .timeline__time {
-  color: #65726d;
+  color: #62716b;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+}
+
+.timeline-empty {
+  min-height: 190px;
 }
 </style>
