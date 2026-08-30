@@ -1,0 +1,14 @@
+**
+!.dockerignore
+!budlog-server/
+!budlog-server/target/
+!budlog-server/target/budlog-server.jar
+!budlog-app/
+!budlog-app/dist/
+!budlog-app/dist/build/
+!budlog-app/dist/build/h5/
+!budlog-app/dist/build/h5/**
+!deploy/
+!deploy/server.Dockerfile
+!deploy/web.Dockerfile
+!deploy/nginx.conf

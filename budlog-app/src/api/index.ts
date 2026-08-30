@@ -1,0 +1,62 @@
+import type {
+  AppSetting,
+  Baby,
+  BabyInput,
+  Dashboard,
+  DiaperInput,
+  DiaperRecord,
+  FeedingInput,
+  FeedingRecord,
+  Milestone,
+  MilestoneInput,
+  PageResult,
+  TaskInput,
+  TaskStatus,
+  Timeline,
+  TodoTask,
+} from "../types";
+import { apiRequest } from "./request";
+
+const query = (params: Record<string, string | number | undefined>) => {
+  const values = Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== "")
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+  return values.length ? `?${values.join("&")}` : "";
+};
+
+export const api = {
+  dashboard: (date?: string) => apiRequest<Dashboard>(`/dashboard${query({ date })}`),
+  timeline: (date: string) => apiRequest<Timeline>(`/timeline${query({ date })}`),
+  getBaby: () => apiRequest<Baby>("/baby"),
+  saveBaby: (data: BabyInput) => apiRequest<Baby>("/baby", { method: "PUT", data }),
+  milestones: () => apiRequest<Milestone[]>("/milestones"),
+  createMilestone: (data: MilestoneInput) => apiRequest<Milestone>("/milestones", { method: "POST", data }),
+  updateMilestone: (id: number, data: MilestoneInput) =>
+    apiRequest<Milestone>(`/milestones/${id}`, { method: "PUT", data }),
+  deleteMilestone: (id: number) => apiRequest<void>(`/milestones/${id}`, { method: "DELETE" }),
+  feedings: (from?: string, to?: string) =>
+    apiRequest<PageResult<FeedingRecord>>(`/feedings${query({ from, to, page: 0, size: 100 })}`),
+  feeding: (id: number) => apiRequest<FeedingRecord>(`/feedings/${id}`),
+  createFeeding: (data: FeedingInput) => apiRequest<FeedingRecord>("/feedings", { method: "POST", data }),
+  updateFeeding: (id: number, data: FeedingInput) =>
+    apiRequest<FeedingRecord>(`/feedings/${id}`, { method: "PUT", data }),
+  deleteFeeding: (id: number) => apiRequest<void>(`/feedings/${id}`, { method: "DELETE" }),
+  diapers: (from?: string, to?: string) =>
+    apiRequest<PageResult<DiaperRecord>>(`/diapers${query({ from, to, page: 0, size: 100 })}`),
+  diaper: (id: number) => apiRequest<DiaperRecord>(`/diapers/${id}`),
+  createDiaper: (data: DiaperInput) => apiRequest<DiaperRecord>("/diapers", { method: "POST", data }),
+  updateDiaper: (id: number, data: DiaperInput) =>
+    apiRequest<DiaperRecord>(`/diapers/${id}`, { method: "PUT", data }),
+  deleteDiaper: (id: number) => apiRequest<void>(`/diapers/${id}`, { method: "DELETE" }),
+  tasks: (status?: TaskStatus) => apiRequest<TodoTask[]>(`/tasks${query({ status })}`),
+  task: (id: number) => apiRequest<TodoTask>(`/tasks/${id}`),
+  dueReminders: () => apiRequest<TodoTask[]>("/tasks/due-reminders"),
+  createTask: (data: TaskInput) => apiRequest<TodoTask>("/tasks", { method: "POST", data }),
+  updateTask: (id: number, data: TaskInput) => apiRequest<TodoTask>(`/tasks/${id}`, { method: "PUT", data }),
+  updateTaskStatus: (id: number, status: TaskStatus) =>
+    apiRequest<TodoTask>(`/tasks/${id}/status`, { method: "PATCH", data: { status } }),
+  deleteTask: (id: number) => apiRequest<void>(`/tasks/${id}`, { method: "DELETE" }),
+  settings: () => apiRequest<AppSetting>("/settings"),
+  saveSettings: (data: Omit<AppSetting, "feedingIntervalAnchor">) =>
+    apiRequest<AppSetting>("/settings", { method: "PUT", data }),
+};

@@ -1,0 +1,13 @@
+# Local secrets and deployment data
+.env
+deploy/.env
+deploy/backups/
+
+# Build and dependency output
+budlog-app/node_modules/
+budlog-app/dist/
+budlog-server/target/
+
+# Editor and operating-system files
+.DS_Store
+*.log

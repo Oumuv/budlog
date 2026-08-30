@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: budlog-server
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  profiles:
+    default: dev
+  datasource:
+    username: ${POSTGRESQL_USER:${DB_USERNAME:budlog}}
+    password: ${POSTGRESQL_PASSWORD:${DB_PASSWORD:}}
+    hikari:
+      maximum-pool-size: 8
+      minimum-idle: 1
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  access:
+    enabled: ${APP_ACCESS_ENABLED:true}
+    password: ${APP_ACCESS_PASSWORD:}
+  timezone: ${APP_TIMEZONE:Asia/Shanghai}
+  feeding:
+    default-interval-minutes: ${DEFAULT_FEEDING_INTERVAL_MIN:180}
+  cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+
+logging:
+  level:
+    root: INFO
+    dev.oumuv.budlog: INFO
