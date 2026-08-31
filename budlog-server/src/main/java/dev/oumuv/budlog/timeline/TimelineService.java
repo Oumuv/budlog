@@ -8,6 +8,9 @@ import dev.oumuv.budlog.dashboard.DailySummaryResponse;
 import dev.oumuv.budlog.diaper.DiaperRecord;
 import dev.oumuv.budlog.diaper.DiaperService;
 import dev.oumuv.budlog.diaper.DiaperType;
+import dev.oumuv.budlog.event.EventRecord;
+import dev.oumuv.budlog.event.EventService;
+import dev.oumuv.budlog.event.EventType;
 import dev.oumuv.budlog.feeding.FeedingRecord;
 import dev.oumuv.budlog.feeding.FeedingService;
 import dev.oumuv.budlog.feeding.FeedingType;
@@ -15,6 +18,8 @@ import dev.oumuv.budlog.milkstorage.MilkStorageRecord;
 import dev.oumuv.budlog.milkstorage.MilkStorageService;
 import dev.oumuv.budlog.task.TaskService;
 import dev.oumuv.budlog.task.TodoTask;
+import dev.oumuv.budlog.weight.WeightRecord;
+import dev.oumuv.budlog.weight.WeightService;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -32,6 +37,8 @@ public class TimelineService {
     private final DiaperService diaperService;
     private final MilkStorageService milkStorageService;
     private final TaskService taskService;
+    private final WeightService weightService;
+    private final EventService eventService;
     private final TimeService timeService;
 
     public TimelineService(
@@ -40,12 +47,16 @@ public class TimelineService {
             DiaperService diaperService,
             MilkStorageService milkStorageService,
             TaskService taskService,
+            WeightService weightService,
+            EventService eventService,
             TimeService timeService) {
         this.babyService = babyService;
         this.feedingService = feedingService;
         this.diaperService = diaperService;
         this.milkStorageService = milkStorageService;
         this.taskService = taskService;
+        this.weightService = weightService;
+        this.eventService = eventService;
         this.timeService = timeService;
     }
 
@@ -58,6 +69,8 @@ public class TimelineService {
         List<MilkStorageRecord> milkStorages = milkStorageService.recordsBetween(
                 baby.getId(), range.getStart(), range.getEnd());
         List<TodoTask> tasks = taskService.completedBetween(baby.getId(), range.getStart(), range.getEnd());
+        List<WeightRecord> weights = weightService.recordsBetween(baby.getId(), range.getStart(), range.getEnd());
+        List<EventRecord> events = eventService.recordsBetween(baby.getId(), range.getStart(), range.getEnd());
 
         List<TimelineItemResponse> items = new ArrayList<TimelineItemResponse>();
         for (FeedingRecord record : feedings) {
@@ -79,14 +92,22 @@ public class TimelineService {
                     .subtitle(task.getTitle())
                     .build());
         }
+        for (WeightRecord record : weights) {
+            items.add(weightItem(record));
+        }
+        for (EventRecord record : events) {
+            items.add(eventItem(record));
+        }
         items.sort(Comparator.comparing(TimelineItemResponse::getEventTime).reversed());
-        return new TimelineResponse(resolvedDate, summary(feedings, diapers, milkStorages), items);
+        return new TimelineResponse(resolvedDate, summary(feedings, diapers, milkStorages, weights, events), items);
     }
 
     private DailySummaryResponse summary(
             List<FeedingRecord> feedings,
             List<DiaperRecord> diapers,
-            List<MilkStorageRecord> milkStorages) {
+            List<MilkStorageRecord> milkStorages,
+            List<WeightRecord> weights,
+            List<EventRecord> events) {
         BigDecimal bottleAmount = BigDecimal.ZERO;
         BigDecimal storedMilkAmount = BigDecimal.ZERO;
         long directMinutes = 0;
@@ -118,7 +139,9 @@ public class TimelineService {
                 milkStorages.size(),
                 storedMilkAmount,
                 pee,
-                poop);
+                poop,
+                weights.isEmpty() ? null : weights.get(0).getWeightKg(),
+                events.size());
     }
 
     private TimelineItemResponse feedingItem(FeedingRecord record) {
@@ -169,5 +192,42 @@ public class TimelineService {
                 .title("存奶")
                 .subtitle(record.getAmountMl().stripTrailingZeros().toPlainString() + " ml")
                 .build();
+    }
+
+    private TimelineItemResponse weightItem(WeightRecord record) {
+        return TimelineItemResponse.builder()
+                .id(record.getId())
+                .category("WEIGHT")
+                .recordType("MEASURED")
+                .eventTime(record.getMeasuredAt())
+                .title("体重 " + record.getWeightKg().stripTrailingZeros().toPlainString() + " kg")
+                .subtitle(record.getNote())
+                .build();
+    }
+
+    private TimelineItemResponse eventItem(EventRecord record) {
+        String typeLabel = eventTypeLabel(record.getEventType());
+        String subtitle = record.getNote() == null ? typeLabel : typeLabel + " · " + record.getNote();
+        return TimelineItemResponse.builder()
+                .id(record.getId())
+                .category("EVENT")
+                .recordType(record.getEventType().name())
+                .eventTime(record.getOccurredAt())
+                .title(record.getTitle())
+                .subtitle(subtitle)
+                .build();
+    }
+
+    private String eventTypeLabel(EventType type) {
+        if (type == EventType.VACCINE) {
+            return "疫苗";
+        }
+        if (type == EventType.DOCUMENT) {
+            return "证件";
+        }
+        if (type == EventType.MOMENT) {
+            return "小事";
+        }
+        return "其他";
     }
 }

@@ -28,5 +28,8 @@ public class BusinessException extends RuntimeException {
     public static BusinessException validation(String message) {
         return new BusinessException(40000, HttpStatus.BAD_REQUEST, message);
     }
-}
 
+    public static BusinessException conflict(String message) {
+        return new BusinessException(40900, HttpStatus.CONFLICT, message);
+    }
+}

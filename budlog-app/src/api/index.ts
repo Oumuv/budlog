@@ -5,6 +5,8 @@ import type {
   Dashboard,
   DiaperInput,
   DiaperRecord,
+  EventInput,
+  EventRecord,
   FeedingInput,
   FeedingRecord,
   MilkStorageInput,
@@ -16,6 +18,8 @@ import type {
   TaskStatus,
   Timeline,
   TodoTask,
+  WeightInput,
+  WeightRecord,
 } from "../types";
 import { apiRequest } from "./request";
 
@@ -58,6 +62,20 @@ export const api = {
   updateDiaper: (id: number, data: DiaperInput) =>
     apiRequest<DiaperRecord>(`/diapers/${id}`, { method: "PUT", data }),
   deleteDiaper: (id: number) => apiRequest<void>(`/diapers/${id}`, { method: "DELETE" }),
+  weightRecords: (from?: string, to?: string) =>
+    apiRequest<PageResult<WeightRecord>>(`/weight-records${query({ from, to, page: 0, size: 100 })}`),
+  weightRecord: (id: number) => apiRequest<WeightRecord>(`/weight-records/${id}`),
+  createWeight: (data: WeightInput) => apiRequest<WeightRecord>("/weight-records", { method: "POST", data }),
+  updateWeight: (id: number, data: WeightInput) =>
+    apiRequest<WeightRecord>(`/weight-records/${id}`, { method: "PUT", data }),
+  deleteWeight: (id: number) => apiRequest<void>(`/weight-records/${id}`, { method: "DELETE" }),
+  events: (from?: string, to?: string) =>
+    apiRequest<PageResult<EventRecord>>(`/events${query({ from, to, page: 0, size: 100 })}`),
+  event: (id: number) => apiRequest<EventRecord>(`/events/${id}`),
+  createEvent: (data: EventInput) => apiRequest<EventRecord>("/events", { method: "POST", data }),
+  updateEvent: (id: number, data: EventInput) =>
+    apiRequest<EventRecord>(`/events/${id}`, { method: "PUT", data }),
+  deleteEvent: (id: number) => apiRequest<void>(`/events/${id}`, { method: "DELETE" }),
   tasks: (status?: TaskStatus) => apiRequest<TodoTask[]>(`/tasks${query({ status })}`),
   task: (id: number) => apiRequest<TodoTask>(`/tasks/${id}`),
   dueReminders: () => apiRequest<TodoTask[]>("/tasks/due-reminders"),

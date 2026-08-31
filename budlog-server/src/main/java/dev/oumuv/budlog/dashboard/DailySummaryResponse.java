@@ -16,8 +16,10 @@ public class DailySummaryResponse {
     private BigDecimal storedMilkAmountMl;
     private int peeCount;
     private int poopCount;
+    private BigDecimal weightKg;
+    private int eventCount;
 
     public static DailySummaryResponse empty() {
-        return new DailySummaryResponse(0, BigDecimal.ZERO, 0, 0, BigDecimal.ZERO, 0, 0);
+        return new DailySummaryResponse(0, BigDecimal.ZERO, 0, 0, BigDecimal.ZERO, 0, 0, null, 0);
     }
 }

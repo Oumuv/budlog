@@ -14,6 +14,8 @@
     { "path": "pages/feeding/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/milk-storage/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/diaper/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/weight/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/event/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/task-edit/index", "style": { "navigationStyle": "custom" } }
   ],
   "globalStyle": {

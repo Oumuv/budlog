@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Droplets, Milk, PackagePlus, Plus } from "lucide-vue-next";
+import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Droplets, Milk, NotebookPen, PackagePlus, Plus, Scale } from "lucide-vue-next";
 import { onShow } from "@dcloudio/uni-app";
 import { computed, ref } from "vue";
 import { api } from "../../api";
@@ -66,6 +66,8 @@ function edit(item: TimelineItem) {
   if (item.category === "FEEDING") go(`/pages/feeding/index?id=${item.id}`);
   if (item.category === "MILK_STORAGE") go(`/pages/milk-storage/index?id=${item.id}`);
   if (item.category === "DIAPER") go(`/pages/diaper/index?id=${item.id}`);
+  if (item.category === "WEIGHT") go(`/pages/weight/index?id=${item.id}`);
+  if (item.category === "EVENT") go(`/pages/event/index?id=${item.id}`);
 }
 </script>
 
@@ -74,7 +76,7 @@ function edit(item: TimelineItem) {
     <view class="records-head">
       <view>
         <text class="page-title">记录</text>
-        <text class="page-subtitle">按日期回看喂养、存奶与尿便变化</text>
+        <text class="page-subtitle">按日期回看宝宝的日常记录</text>
       </view>
       <view class="records-add">
         <button class="icon-btn records-add__feeding" aria-label="新增喂奶" title="新增喂奶" @click="go('/pages/feeding/index?mode=bottle')"><Milk :size="20" /></button>
@@ -112,6 +114,10 @@ function edit(item: TimelineItem) {
         <PackagePlus :size="16" />
         <text>存奶 {{ timeline.summary.milkStorageCount }} 次</text>
         <text class="record-summary__storage-amount">{{ timeline.summary.storedMilkAmountMl }} ml</text>
+      </view>
+      <view class="record-summary__extra">
+        <view><Scale :size="16" /><text>体重</text><text class="record-summary__extra-value">{{ timeline.summary.weightKg ?? "--" }} kg</text></view>
+        <view><NotebookPen :size="16" /><text>事件</text><text class="record-summary__extra-value">{{ timeline.summary.eventCount }} 条</text></view>
       </view>
     </view>
 
@@ -242,6 +248,45 @@ function edit(item: TimelineItem) {
 
 .record-summary__storage > svg { flex: 0 0 auto; }
 .record-summary__storage-amount { margin-left: auto; color: var(--bud-color-ink); font-weight: 750; }
+
+.record-summary__extra {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--bud-color-line-soft);
+}
+
+.record-summary__extra > view {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  min-height: 42px;
+  padding: 8px 4px;
+  align-items: center;
+  gap: 5px;
+  color: var(--bud-color-muted);
+  font-size: 12px;
+}
+
+.record-summary__extra > view:first-child {
+  border-right: 1px solid var(--bud-color-line-soft);
+}
+
+.record-summary__extra-value {
+  color: var(--bud-color-ink);
+  font-weight: 750;
+}
+
+@media (max-width: 420px) {
+  .records-head {
+    align-items: flex-start;
+  }
+
+  .records-add {
+    max-width: 140px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
 
 .timeline-title {
   margin-top: 24px;

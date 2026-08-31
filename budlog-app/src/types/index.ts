@@ -2,6 +2,7 @@ export type FeedingType = "BREAST_DIRECT" | "BREAST_BOTTLE" | "FORMULA_BOTTLE";
 export type BreastSide = "LEFT" | "RIGHT" | "BOTH";
 export type DiaperType = "PEE" | "POOP" | "BOTH";
 export type TaskStatus = "TODO" | "DONE" | "CANCELED";
+export type EventType = "VACCINE" | "DOCUMENT" | "MOMENT" | "OTHER";
 
 export interface Baby {
   id: number;
@@ -94,6 +95,39 @@ export interface DiaperInput {
   note?: string;
 }
 
+export interface WeightRecord {
+  id: number;
+  clientRequestId: string;
+  measuredAt: string;
+  recordDate: string;
+  weightKg: number;
+  note?: string;
+}
+
+export interface WeightInput {
+  clientRequestId: string;
+  measuredAt: string;
+  weightKg: number;
+  note?: string;
+}
+
+export interface EventRecord {
+  id: number;
+  clientRequestId: string;
+  eventType: EventType;
+  title: string;
+  occurredAt: string;
+  note?: string;
+}
+
+export interface EventInput {
+  clientRequestId: string;
+  eventType: EventType;
+  title: string;
+  occurredAt: string;
+  note?: string;
+}
+
 export interface TodoTask {
   id: number;
   clientRequestId: string;
@@ -130,11 +164,13 @@ export interface DailySummary {
   storedMilkAmountMl: number;
   peeCount: number;
   poopCount: number;
+  weightKg?: number;
+  eventCount: number;
 }
 
 export interface TimelineItem {
   id: number;
-  category: "FEEDING" | "DIAPER" | "MILK_STORAGE" | "TASK";
+  category: "FEEDING" | "DIAPER" | "MILK_STORAGE" | "TASK" | "WEIGHT" | "EVENT";
   recordType: string;
   eventTime: string;
   title: string;

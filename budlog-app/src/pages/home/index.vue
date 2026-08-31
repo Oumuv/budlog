@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertCircle, Baby, BellRing, CalendarDays, Check, ChevronRight, Droplets, Heart, Milk, PackagePlus, Plus, Sparkles, Timer, Toilet } from "lucide-vue-next";
+import { AlertCircle, Baby, BellRing, CalendarDays, Check, ChevronRight, Droplets, Heart, Milk, NotebookPen, PackagePlus, Plus, Scale, Sparkles, Timer } from "lucide-vue-next";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import { computed, onUnmounted, ref } from "vue";
 import { api } from "../../api";
@@ -21,6 +21,8 @@ const feedingMinutes = computed(() => {
   const value = dashboard.value?.lastFeeding?.startTime;
   return value ? Math.max(0, Math.floor((now.value - new Date(value).getTime()) / 60_000)) : undefined;
 });
+
+const calendarAgeDays = computed(() => Math.max(0, (dashboard.value?.baby?.ageDayNumber ?? 1) - 1));
 
 const nextFeedingText = computed(() => {
   const value = dashboard.value?.nextExpectedFeedingTime;
@@ -69,6 +71,8 @@ function editTimeline(item: TimelineItem) {
   if (item.category === "FEEDING") go(`/pages/feeding/index?id=${item.id}`);
   if (item.category === "MILK_STORAGE") go(`/pages/milk-storage/index?id=${item.id}`);
   if (item.category === "DIAPER") go(`/pages/diaper/index?id=${item.id}`);
+  if (item.category === "WEIGHT") go(`/pages/weight/index?id=${item.id}`);
+  if (item.category === "EVENT") go(`/pages/event/index?id=${item.id}`);
 }
 
 async function completeTask(id: number) {
@@ -127,12 +131,12 @@ function milestoneLabel(days: number) {
             <view class="baby-overview__eyebrow"><Sparkles :size="14" /><text>宝宝状态</text></view>
             <text class="baby-overview__name">{{ dashboard.baby.name }}</text>
           </view>
-          <text class="baby-overview__age-badge">第 {{ dashboard.baby.ageDayNumber }} 天</text>
+          <text class="baby-overview__age-badge">{{ calendarAgeDays }} 日龄</text>
         </view>
         <view class="baby-overview__duration">
           <view>
-            <text class="baby-overview__duration-value">{{ dashboard.baby.ageDurationDays }} 天</text>
-            <text class="baby-overview__duration-label">精确月龄</text>
+            <text class="baby-overview__duration-value">{{ calendarAgeDays }} 天</text>
+            <text class="baby-overview__duration-label">已出生天数</text>
           </view>
           <view>
             <text class="baby-overview__duration-value">{{ dashboard.baby.ageMonths }} 个月 {{ dashboard.baby.ageRemainingDays }} 天</text>
@@ -166,11 +170,14 @@ function milestoneLabel(days: number) {
           <button class="quick-action quick-action--storage" @click="go('/pages/milk-storage/index')">
             <PackagePlus :size="23" /><text>存奶</text>
           </button>
-          <button class="quick-action quick-action--pee" @click="go('/pages/diaper/index?type=PEE')">
-            <Droplets :size="23" /><text>尿尿</text>
+          <button class="quick-action quick-action--diaper" @click="go('/pages/diaper/index')">
+            <Droplets :size="23" /><text>尿便</text>
           </button>
-          <button class="quick-action quick-action--poop" @click="go('/pages/diaper/index?type=POOP')">
-            <Toilet :size="23" /><text>便便</text>
+          <button class="quick-action quick-action--weight" @click="go('/pages/weight/index')">
+            <Scale :size="23" /><text>体重</text>
+          </button>
+          <button class="quick-action quick-action--event" @click="go('/pages/event/index')">
+            <NotebookPen :size="23" /><text>事件</text>
           </button>
         </view>
       </view>
@@ -208,6 +215,10 @@ function milestoneLabel(days: number) {
             <PackagePlus :size="17" />
             <text>存奶 {{ dashboard.todaySummary.milkStorageCount }} 次</text>
             <text class="summary-strip__storage-amount">{{ dashboard.todaySummary.storedMilkAmountMl }} ml</text>
+          </view>
+          <view class="summary-strip__extra">
+            <view><Scale :size="16" /><text>体重 {{ dashboard.todaySummary.weightKg ?? "--" }} kg</text></view>
+            <view><NotebookPen :size="16" /><text>事件 {{ dashboard.todaySummary.eventCount }} 条</text></view>
           </view>
         </view>
       </view>
@@ -534,7 +545,7 @@ function milestoneLabel(days: number) {
 
 .quick-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -560,8 +571,9 @@ function milestoneLabel(days: number) {
 .quick-action--direct { color: #99463f; border-color: #f0d1cc; background: var(--bud-color-coral-soft); }
 .quick-action--bottle { color: #356957; border-color: #cfe4da; background: var(--bud-color-sage-soft); }
 .quick-action--storage { color: #47705e; border-color: #cfe4da; background: #eef7f2; }
-.quick-action--pee { color: #2d7081; border-color: #cee5ea; background: var(--bud-color-cyan-soft); }
-.quick-action--poop { color: #82601d; border-color: #eedba3; background: var(--bud-color-gold-soft); }
+.quick-action--diaper { color: #2d7081; border-color: #cee5ea; background: var(--bud-color-cyan-soft); }
+.quick-action--weight { color: #476779; border-color: #d3e0e5; background: #eef4f6; }
+.quick-action--event { color: #72556f; border-color: #e4d4e1; background: #f5eff5; }
 
 .summary-strip {
   display: grid;
@@ -576,6 +588,36 @@ function milestoneLabel(days: number) {
   color: var(--bud-color-muted);
   font-size: 11px;
   text-align: center;
+}
+
+.summary-strip__extra {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--bud-color-line-soft);
+}
+
+.summary-strip__extra > view {
+  display: flex;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 6px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--bud-color-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.summary-strip__extra > view:first-child {
+  border-right: 1px solid var(--bud-color-line-soft);
+}
+
+@media (min-width: 600px) {
+  .quick-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
 }
 
 .summary-strip__metric:nth-child(4) { border-right: 0; }

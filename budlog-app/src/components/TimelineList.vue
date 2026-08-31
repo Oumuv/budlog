@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckCircle2, ClipboardList, Droplets, Milk, PackagePlus } from "lucide-vue-next";
+import { CheckCircle2, ClipboardList, Droplets, Milk, NotebookPen, PackagePlus, Scale } from "lucide-vue-next";
 import type { TimelineItem } from "../types";
 import { formatTime } from "../utils/date";
 
@@ -20,6 +20,8 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
         <Milk v-if="item.category === 'FEEDING'" :size="18" />
         <Droplets v-else-if="item.category === 'DIAPER'" :size="18" />
         <PackagePlus v-else-if="item.category === 'MILK_STORAGE'" :size="18" />
+        <Scale v-else-if="item.category === 'WEIGHT'" :size="18" />
+        <NotebookPen v-else-if="item.category === 'EVENT'" :size="18" />
         <CheckCircle2 v-else :size="18" />
       </view>
       <view class="timeline__body">
@@ -32,7 +34,7 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
   <view v-else class="state-panel surface timeline-empty">
     <view class="state-panel__icon"><ClipboardList :size="21" /></view>
     <text class="state-panel__title">还没有记录</text>
-    <text class="state-panel__copy">喂奶、存奶、尿便和完成的任务会按时间显示在这里</text>
+    <text class="state-panel__copy">喂奶、存奶、尿便、体重、事件和完成的任务会按时间显示在这里</text>
   </view>
 </template>
 
@@ -86,6 +88,16 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
 .timeline__icon--task {
   color: var(--bud-color-gold);
   background: var(--bud-color-gold-soft);
+}
+
+.timeline__icon--weight {
+  color: #476779;
+  background: #eef4f6;
+}
+
+.timeline__icon--event {
+  color: #72556f;
+  background: #f5eff5;
 }
 
 .timeline__body {
