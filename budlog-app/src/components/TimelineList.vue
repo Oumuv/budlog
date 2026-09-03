@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { CheckCircle2, ClipboardList, Droplets, Milk, NotebookPen, PackagePlus, Scale } from "lucide-vue-next";
 import type { TimelineItem } from "../types";
-import { formatTime } from "../utils/date";
+import { formatDuration, formatTime } from "../utils/date";
 
 defineProps<{ items: TimelineItem[]; editable?: boolean }>();
 const emit = defineEmits<{ edit: [item: TimelineItem] }>();
+
+function intervalText(item: TimelineItem): string {
+  if (item.minutesSincePrevious === undefined || item.minutesSincePrevious === null) return "";
+  const category = item.category === "FEEDING" ? "喂奶" : "尿便";
+  return `距上次${category} ${formatDuration(item.minutesSincePrevious)}`;
+}
 </script>
 
 <template>
@@ -27,6 +33,7 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
       <view class="timeline__body">
         <text class="timeline__title">{{ item.title }}</text>
         <text v-if="item.subtitle" class="timeline__subtitle">{{ item.subtitle }}</text>
+        <text v-if="item.minutesSincePrevious != null" class="timeline__interval">{{ intervalText(item) }}</text>
       </view>
       <text class="timeline__time">{{ formatTime(item.eventTime) }}</text>
     </view>
@@ -121,6 +128,14 @@ const emit = defineEmits<{ edit: [item: TimelineItem] }>();
   color: var(--bud-color-muted);
   font-size: 13px;
   line-height: 19px;
+}
+
+.timeline__interval {
+  display: block;
+  color: var(--bud-color-muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 18px;
 }
 
 .timeline__time {

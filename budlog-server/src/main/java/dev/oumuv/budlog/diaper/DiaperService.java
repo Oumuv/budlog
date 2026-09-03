@@ -93,6 +93,12 @@ public class DiaperService {
     }
 
     @Transactional(readOnly = true)
+    public DiaperRecord latestBefore(Long babyId, OffsetDateTime recordTime) {
+        return repository.findFirstByBabyIdAndDeletedAtIsNullAndRecordTimeLessThanOrderByRecordTimeDesc(
+                babyId, recordTime).orElse(null);
+    }
+
+    @Transactional(readOnly = true)
     public DiaperRecord lastPee(Long babyId) {
         return repository.findFirstByBabyIdAndDeletedAtIsNullAndRecordTypeInOrderByRecordTimeDesc(
                 babyId, Arrays.asList(DiaperType.PEE, DiaperType.BOTH)).orElse(null);

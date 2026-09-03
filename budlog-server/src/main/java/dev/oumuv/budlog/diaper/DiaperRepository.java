@@ -18,6 +18,9 @@ public interface DiaperRepository extends JpaRepository<DiaperRecord, Long> {
     Optional<DiaperRecord> findFirstByBabyIdAndDeletedAtIsNullAndRecordTypeInOrderByRecordTimeDesc(
             Long babyId, List<DiaperType> types);
 
+    Optional<DiaperRecord> findFirstByBabyIdAndDeletedAtIsNullAndRecordTimeLessThanOrderByRecordTimeDesc(
+            Long babyId, OffsetDateTime recordTime);
+
     Page<DiaperRecord> findAllByBabyIdAndDeletedAtIsNullOrderByRecordTimeDesc(Long babyId, Pageable pageable);
 
     Page<DiaperRecord> findAllByBabyIdAndDeletedAtIsNullAndRecordTimeGreaterThanEqualAndRecordTimeLessThanOrderByRecordTimeDesc(

@@ -15,5 +15,5 @@ public class TimelineItemResponse {
     private OffsetDateTime eventTime;
     private String title;
     private String subtitle;
+    private Long minutesSincePrevious;
 }
-

@@ -106,6 +106,12 @@ public class FeedingService {
         return repository.findFirstByBabyIdAndDeletedAtIsNullOrderByStartTimeDesc(babyId).orElse(null);
     }
 
+    @Transactional(readOnly = true)
+    public FeedingRecord latestBefore(Long babyId, OffsetDateTime startTime) {
+        return repository.findFirstByBabyIdAndDeletedAtIsNullAndStartTimeLessThanOrderByStartTimeDesc(
+                babyId, startTime).orElse(null);
+    }
+
     public FeedingResponse toResponse(FeedingRecord record) {
         FeedingRecord previous = repository
                 .findFirstByBabyIdAndDeletedAtIsNullAndStartTimeLessThanOrderByStartTimeDesc(

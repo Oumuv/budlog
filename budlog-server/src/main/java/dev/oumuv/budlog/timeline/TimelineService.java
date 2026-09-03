@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -73,11 +74,38 @@ public class TimelineService {
         List<EventRecord> events = eventService.recordsBetween(baby.getId(), range.getStart(), range.getEnd());
 
         List<TimelineItemResponse> items = new ArrayList<TimelineItemResponse>();
-        for (FeedingRecord record : feedings) {
-            items.add(feedingItem(record));
+        List<FeedingRecord> chronologicalFeedings = new ArrayList<FeedingRecord>(feedings);
+        chronologicalFeedings.sort(Comparator.comparing(FeedingRecord::getStartTime));
+        FeedingRecord previousFeeding = chronologicalFeedings.isEmpty()
+                ? null
+                : feedingService.latestBefore(baby.getId(), range.getStart());
+        OffsetDateTime previousFeedingTime = previousFeeding == null ? null : previousFeeding.getStartTime();
+        OffsetDateTime feedingGroupTime = null;
+        Long feedingInterval = null;
+        for (FeedingRecord record : chronologicalFeedings) {
+            if (!record.getStartTime().equals(feedingGroupTime)) {
+                feedingInterval = minutesBetween(previousFeedingTime, record.getStartTime());
+                previousFeedingTime = record.getStartTime();
+                feedingGroupTime = record.getStartTime();
+            }
+            items.add(feedingItem(record, feedingInterval));
         }
-        for (DiaperRecord record : diapers) {
-            items.add(diaperItem(record));
+
+        List<DiaperRecord> chronologicalDiapers = new ArrayList<DiaperRecord>(diapers);
+        chronologicalDiapers.sort(Comparator.comparing(DiaperRecord::getRecordTime));
+        DiaperRecord previousDiaper = chronologicalDiapers.isEmpty()
+                ? null
+                : diaperService.latestBefore(baby.getId(), range.getStart());
+        OffsetDateTime previousDiaperTime = previousDiaper == null ? null : previousDiaper.getRecordTime();
+        OffsetDateTime diaperGroupTime = null;
+        Long diaperInterval = null;
+        for (DiaperRecord record : chronologicalDiapers) {
+            if (!record.getRecordTime().equals(diaperGroupTime)) {
+                diaperInterval = minutesBetween(previousDiaperTime, record.getRecordTime());
+                previousDiaperTime = record.getRecordTime();
+                diaperGroupTime = record.getRecordTime();
+            }
+            items.add(diaperItem(record, diaperInterval));
         }
         for (MilkStorageRecord record : milkStorages) {
             items.add(milkStorageItem(record));
@@ -144,7 +172,7 @@ public class TimelineService {
                 events.size());
     }
 
-    private TimelineItemResponse feedingItem(FeedingRecord record) {
+    private TimelineItemResponse feedingItem(FeedingRecord record, Long minutesSincePrevious) {
         String title;
         String subtitle;
         if (record.getFeedingType() == FeedingType.BREAST_DIRECT) {
@@ -166,10 +194,11 @@ public class TimelineService {
                 .eventTime(record.getStartTime())
                 .title(title)
                 .subtitle(subtitle)
+                .minutesSincePrevious(minutesSincePrevious)
                 .build();
     }
 
-    private TimelineItemResponse diaperItem(DiaperRecord record) {
+    private TimelineItemResponse diaperItem(DiaperRecord record, Long minutesSincePrevious) {
         String title = record.getRecordType() == DiaperType.PEE
                 ? "尿尿"
                 : record.getRecordType() == DiaperType.POOP ? "便便" : "尿便都有";
@@ -180,7 +209,12 @@ public class TimelineService {
                 .eventTime(record.getRecordTime())
                 .title(title)
                 .subtitle(record.getNote())
+                .minutesSincePrevious(minutesSincePrevious)
                 .build();
+    }
+
+    private Long minutesBetween(OffsetDateTime previous, OffsetDateTime current) {
+        return previous == null ? null : Math.max(0, Duration.between(previous, current).toMinutes());
     }
 
     private TimelineItemResponse milkStorageItem(MilkStorageRecord record) {

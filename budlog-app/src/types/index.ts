@@ -175,6 +175,7 @@ export interface TimelineItem {
   eventTime: string;
   title: string;
   subtitle?: string;
+  minutesSincePrevious?: number;
 }
 
 export interface Timeline {
