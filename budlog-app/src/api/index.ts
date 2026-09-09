@@ -21,6 +21,7 @@ import type {
   WeightInput,
   WeightRecord,
 } from "../types";
+import { toIso } from "../utils/date";
 import { apiRequest } from "./request";
 
 const query = (params: Record<string, string | number | undefined>) => {
@@ -28,6 +29,11 @@ const query = (params: Record<string, string | number | undefined>) => {
     .filter(([, value]) => value !== undefined && value !== "")
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
   return values.length ? `?${values.join("&")}` : "";
+};
+
+const rangeDateTime = (value?: string) => {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return toIso(`${value}T00:00`);
 };
 
 export const api = {
@@ -41,14 +47,24 @@ export const api = {
     apiRequest<Milestone>(`/milestones/${id}`, { method: "PUT", data }),
   deleteMilestone: (id: number) => apiRequest<void>(`/milestones/${id}`, { method: "DELETE" }),
   feedings: (from?: string, to?: string) =>
-    apiRequest<PageResult<FeedingRecord>>(`/feedings${query({ from, to, page: 0, size: 100 })}`),
+    apiRequest<PageResult<FeedingRecord>>(`/feedings${query({
+      from: rangeDateTime(from),
+      to: rangeDateTime(to),
+      page: 0,
+      size: 100,
+    })}`),
   feeding: (id: number) => apiRequest<FeedingRecord>(`/feedings/${id}`),
   createFeeding: (data: FeedingInput) => apiRequest<FeedingRecord>("/feedings", { method: "POST", data }),
   updateFeeding: (id: number, data: FeedingInput) =>
     apiRequest<FeedingRecord>(`/feedings/${id}`, { method: "PUT", data }),
   deleteFeeding: (id: number) => apiRequest<void>(`/feedings/${id}`, { method: "DELETE" }),
   milkStorages: (from?: string, to?: string) =>
-    apiRequest<PageResult<MilkStorageRecord>>(`/milk-storage-records${query({ from, to, page: 0, size: 100 })}`),
+    apiRequest<PageResult<MilkStorageRecord>>(`/milk-storage-records${query({
+      from: rangeDateTime(from),
+      to: rangeDateTime(to),
+      page: 0,
+      size: 100,
+    })}`),
   milkStorage: (id: number) => apiRequest<MilkStorageRecord>(`/milk-storage-records/${id}`),
   createMilkStorage: (data: MilkStorageInput) =>
     apiRequest<MilkStorageRecord>("/milk-storage-records", { method: "POST", data }),
