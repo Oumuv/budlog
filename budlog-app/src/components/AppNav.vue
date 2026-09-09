@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { House, ListOrdered, Settings, SquareCheckBig } from "lucide-vue-next";
+import { ChartLine, House, ListOrdered, Settings, SquareCheckBig } from "lucide-vue-next";
 
-const props = defineProps<{ current: "home" | "records" | "tasks" | "settings" }>();
+const props = defineProps<{ current: "home" | "records" | "analytics" | "tasks" | "settings" }>();
 
 const items = [
   { key: "home", label: "首页", url: "/pages/home/index", icon: House },
   { key: "records", label: "记录", url: "/pages/records/index", icon: ListOrdered },
+  { key: "analytics", label: "趋势", url: "/pages/analytics/index", icon: ChartLine },
   { key: "tasks", label: "任务", url: "/pages/tasks/index", icon: SquareCheckBig },
   { key: "settings", label: "设置", url: "/pages/settings/index", icon: Settings },
 ] as const;
