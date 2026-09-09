@@ -9,6 +9,7 @@
     { "path": "pages/access/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/home/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/records/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/analytics/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/tasks/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/settings/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/feeding/index", "style": { "navigationStyle": "custom" } },
