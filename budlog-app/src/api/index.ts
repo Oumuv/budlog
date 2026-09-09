@@ -2,6 +2,7 @@ import type {
   AppSetting,
   Baby,
   BabyInput,
+  CalendarData,
   Dashboard,
   DiaperInput,
   DiaperRecord,
@@ -37,6 +38,7 @@ const rangeDateTime = (value?: string) => {
 };
 
 export const api = {
+  calendar: (from: string, to: string) => apiRequest<CalendarData>(`/calendar${query({ from, to })}`),
   dashboard: (date?: string) => apiRequest<Dashboard>(`/dashboard${query({ date })}`),
   timeline: (date: string) => apiRequest<Timeline>(`/timeline${query({ date })}`),
   getBaby: () => apiRequest<Baby>("/baby"),
