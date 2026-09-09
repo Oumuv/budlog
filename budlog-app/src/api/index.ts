@@ -31,7 +31,7 @@ const query = (params: Record<string, string | number | undefined>) => {
   return values.length ? `?${values.join("&")}` : "";
 };
 
-const feedingDateTime = (value?: string) => {
+const rangeDateTime = (value?: string) => {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   return toIso(`${value}T00:00`);
 };
@@ -48,8 +48,8 @@ export const api = {
   deleteMilestone: (id: number) => apiRequest<void>(`/milestones/${id}`, { method: "DELETE" }),
   feedings: (from?: string, to?: string) =>
     apiRequest<PageResult<FeedingRecord>>(`/feedings${query({
-      from: feedingDateTime(from),
-      to: feedingDateTime(to),
+      from: rangeDateTime(from),
+      to: rangeDateTime(to),
       page: 0,
       size: 100,
     })}`),
@@ -59,7 +59,12 @@ export const api = {
     apiRequest<FeedingRecord>(`/feedings/${id}`, { method: "PUT", data }),
   deleteFeeding: (id: number) => apiRequest<void>(`/feedings/${id}`, { method: "DELETE" }),
   milkStorages: (from?: string, to?: string) =>
-    apiRequest<PageResult<MilkStorageRecord>>(`/milk-storage-records${query({ from, to, page: 0, size: 100 })}`),
+    apiRequest<PageResult<MilkStorageRecord>>(`/milk-storage-records${query({
+      from: rangeDateTime(from),
+      to: rangeDateTime(to),
+      page: 0,
+      size: 100,
+    })}`),
   milkStorage: (id: number) => apiRequest<MilkStorageRecord>(`/milk-storage-records/${id}`),
   createMilkStorage: (data: MilkStorageInput) =>
     apiRequest<MilkStorageRecord>("/milk-storage-records", { method: "POST", data }),
