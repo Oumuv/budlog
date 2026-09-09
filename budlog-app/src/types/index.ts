@@ -211,3 +211,24 @@ export interface PageResult<T> {
   totalElements: number;
   totalPages: number;
 }
+
+export type CalendarCategory = TimelineItem["category"] | "MILESTONE";
+
+export interface CalendarItem {
+  key: string;
+  id?: number;
+  category: CalendarCategory;
+  recordType: string;
+  date: string;
+  eventTime: string;
+  title: string;
+  subtitle?: string;
+  overdue: boolean;
+}
+
+export interface CalendarData {
+  from: string;
+  to: string;
+  timezone: string;
+  items: CalendarItem[];
+}

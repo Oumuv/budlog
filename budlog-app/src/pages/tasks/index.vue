@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertCircle, Check, ClipboardCheck, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-vue-next";
+import { AlertCircle, CalendarDays, Check, ClipboardCheck, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-vue-next";
 import { onShow } from "@dcloudio/uni-app";
 import { computed, ref } from "vue";
 import { api } from "../../api";
@@ -86,9 +86,12 @@ function statusLabel(status: TaskStatus) {
         <text class="page-title">任务</text>
         <text class="page-subtitle">把照护事项放在同一个地方</text>
       </view>
-      <wd-button :round="false" size="medium" custom-class="tasks-add" @click="go('/pages/task-edit/index')">
-        <Plus :size="17" />新增
-      </wd-button>
+      <view class="tasks-head__actions">
+        <button class="icon-btn" aria-label="育儿日历" title="查看日历" @click="go('/pages/calendar/index')"><CalendarDays :size="21" /></button>
+        <wd-button :round="false" size="medium" custom-class="tasks-add" @click="go('/pages/task-edit/index')">
+          <Plus :size="17" />新增
+        </wd-button>
+      </view>
     </view>
 
     <wd-segmented v-model:value="filter" :options="filterOptions" size="large" custom-class="task-filters">
@@ -138,6 +141,7 @@ function statusLabel(status: TaskStatus) {
 </template>
 
 <style scoped>
+.tasks-head__actions { display: flex; flex: none; align-items: center; gap: 6px; }
 .tasks-head {
   display: flex;
   align-items: center;

@@ -158,6 +158,12 @@ function milestoneLabel(days: number) {
         </view>
       </view>
 
+      <button class="calendar-entry surface" @click="go('/pages/calendar/index')">
+        <CalendarDays :size="24" />
+        <view class="calendar-entry__body"><text class="calendar-entry__title">育儿日历</text><text class="calendar-entry__copy">按日期查看任务、关键节点与日常记录</text></view>
+        <ChevronRight :size="19" />
+      </button>
+
       <view class="section">
         <view class="section-title"><text class="section-title__text">快速记录</text></view>
         <view class="quick-grid">
@@ -255,6 +261,10 @@ function milestoneLabel(days: number) {
 </template>
 
 <style scoped>
+.calendar-entry { display: flex; width: 100%; align-items: center; gap: 12px; margin: 16px 0 0; padding: 15px; color: var(--bud-color-primary); text-align: left; line-height: 1.5; }
+.calendar-entry__body { min-width: 0; flex: 1; }
+.calendar-entry__title { display: block; color: var(--bud-color-ink); font-size: 16px; font-weight: 700; }
+.calendar-entry__copy { display: block; margin-top: 3px; color: var(--bud-color-muted); font-size: 12px; }
 .home-head {
   display: flex;
   align-items: center;

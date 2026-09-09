@@ -11,6 +11,8 @@
     { "path": "pages/records/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/analytics/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/tasks/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/calendar/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/calendar-detail/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/settings/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/feeding/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/milk-storage/index", "style": { "navigationStyle": "custom" } },
