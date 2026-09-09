@@ -1,21 +1,23 @@
 <script setup lang="ts">
-import { AlertCircle, ChartLine, Milk, RefreshCw, Scale, TrendingUp } from "lucide-vue-next";
+import { AlertCircle, ChartLine, Milk, PackagePlus, RefreshCw, Scale, TrendingUp } from "lucide-vue-next";
 import { onShow } from "@dcloudio/uni-app";
 import { computed, ref } from "vue";
 import { api } from "../../api";
 import AppNav from "../../components/AppNav.vue";
-import type { FeedingRecord, WeightRecord } from "../../types";
+import type { FeedingRecord, MilkStorageRecord, WeightRecord } from "../../types";
 import { shiftDay, todayKey, toLocalInput } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
 
 type RangeDays = 7 | 14 | 30;
 interface MilkDay { date: string; amount: number; bottleCount: number; directMinutes: number }
+interface StorageDay { date: string; amount: number; count: number }
 interface WeightDay { date: string; weight?: number }
 
 const rangeDays = ref<RangeDays>(7);
 const loading = ref(true);
 const error = ref("");
 const feedings = ref<FeedingRecord[]>([]);
+const milkStorages = ref<MilkStorageRecord[]>([]);
 const weights = ref<WeightRecord[]>([]);
 const rangeOptions: RangeDays[] = [7, 14, 30];
 
@@ -40,6 +42,19 @@ const milkDays = computed<MilkDay[]>(() => {
   return dateKeys.value.map((date) => map.get(date)!);
 });
 
+const storageDays = computed<StorageDay[]>(() => {
+  const map = new Map<string, StorageDay>();
+  dateKeys.value.forEach((date) => map.set(date, { date, amount: 0, count: 0 }));
+  milkStorages.value.forEach((record) => {
+    const date = toLocalInput(record.storedAt).slice(0, 10);
+    const day = map.get(date);
+    if (!day) return;
+    day.amount += record.amountMl;
+    day.count += 1;
+  });
+  return dateKeys.value.map((date) => map.get(date)!);
+});
+
 const weightDays = computed<WeightDay[]>(() => {
   const byDate = new Map<string, WeightRecord>();
   weights.value.forEach((record) => {
@@ -56,6 +71,13 @@ const totalBottleCount = computed(() => milkDays.value.reduce((sum, day) => sum 
 const totalDirectMinutes = computed(() => milkDays.value.reduce((sum, day) => sum + day.directMinutes, 0));
 const actualMaxMilk = computed(() => Math.max(0, ...milkDays.value.map((day) => day.amount)));
 const milkScaleMax = computed(() => Math.max(1, actualMaxMilk.value));
+
+const totalStoredMilk = computed(() => storageDays.value.reduce((sum, day) => sum + day.amount, 0));
+const avgStoredMilk = computed(() => Math.round(totalStoredMilk.value / Math.max(1, storageDays.value.length)));
+const totalStorageCount = computed(() => storageDays.value.reduce((sum, day) => sum + day.count, 0));
+const actualMaxStoredMilk = computed(() => Math.max(0, ...storageDays.value.map((day) => day.amount)));
+const storageScaleMax = computed(() => Math.max(1, actualMaxStoredMilk.value));
+
 const measuredWeights = computed(() => weightDays.value.filter((day) => day.weight !== undefined) as Array<Required<WeightDay>>);
 const latestWeight = computed(() => measuredWeights.value[measuredWeights.value.length - 1]?.weight);
 const weightDelta = computed(() => {
@@ -78,20 +100,24 @@ async function load() {
     const from = shiftDay(today, -(rangeDays.value - 1));
     const to = shiftDay(today, 1);
     const feedingRecords: FeedingRecord[] = [];
+    const storageRecords: MilkStorageRecord[] = [];
     const weightRecords: WeightRecord[] = [];
 
     for (let cursor = from; cursor < to; cursor = shiftDay(cursor, 3)) {
       const candidateTo = shiftDay(cursor, 3);
       const chunkTo = candidateTo < to ? candidateTo : to;
-      const [feedingPage, weightPage] = await Promise.all([
+      const [feedingPage, storagePage, weightPage] = await Promise.all([
         api.feedings(cursor, chunkTo),
+        api.milkStorages(cursor, chunkTo),
         api.weightRecords(cursor, chunkTo),
       ]);
       feedingRecords.push(...feedingPage.content);
+      storageRecords.push(...storagePage.content);
       weightRecords.push(...weightPage.content);
     }
 
     feedings.value = feedingRecords;
+    milkStorages.value = storageRecords;
     weights.value = weightRecords;
   } catch (exception) {
     error.value = exception instanceof Error ? exception.message : "趋势数据加载失败";
@@ -108,6 +134,10 @@ async function changeRange(days: RangeDays) {
 
 function milkBarHeight(amount: number) {
   return Math.max(amount ? 8 : 2, Math.round((amount / milkScaleMax.value) * 100));
+}
+
+function storageBarHeight(amount: number) {
+  return Math.max(amount ? 8 : 2, Math.round((amount / storageScaleMax.value) * 100));
 }
 
 function weightBarHeight(weight?: number) {
@@ -129,7 +159,7 @@ function signedWeight(value?: number) {
       <view>
         <view class="analytics-head__eyebrow"><ChartLine :size="15" /><text>成长观测</text></view>
         <text class="analytics-head__title">宝宝数据大屏</text>
-        <text class="analytics-head__sub">奶量、亲喂与体重趋势一页掌握</text>
+        <text class="analytics-head__sub">奶量、存奶、亲喂与体重趋势一页掌握</text>
       </view>
       <button class="icon-btn" aria-label="刷新" title="刷新" @click="load"><RefreshCw :size="20" /></button>
     </view>
@@ -189,6 +219,26 @@ function signedWeight(value?: number) {
           </view>
         </view>
         <view class="chart-footnote"><Milk :size="14" /><text>同期亲喂 {{ totalDirectMinutes }} 分钟</text></view>
+      </view>
+
+      <view class="chart-card surface">
+        <view class="chart-card__head">
+          <view>
+            <text class="chart-card__title">每日存奶量</text>
+            <text class="chart-card__hint">按存奶时间汇总每天保存的母乳量</text>
+          </view>
+          <text class="chart-card__total">累计 {{ totalStoredMilk }} ml</text>
+        </view>
+        <view class="bar-chart">
+          <view v-for="day in storageDays" :key="day.date" class="bar-chart__column">
+            <view class="bar-chart__plot">
+              <text v-if="day.amount" class="bar-chart__value">{{ day.amount }}</text>
+              <view class="bar-chart__bar bar-chart__bar--storage" :class="{ 'bar-chart__bar--empty': !day.amount }" :style="{ height: `${storageBarHeight(day.amount)}%` }" />
+            </view>
+            <text class="bar-chart__date">{{ shortDate(day.date) }}</text>
+          </view>
+        </view>
+        <view class="chart-footnote"><PackagePlus :size="14" /><text>{{ totalStorageCount }} 次存奶 · 日均 {{ avgStoredMilk }} ml · 峰值 {{ actualMaxStoredMilk }} ml</text></view>
       </view>
 
       <view class="chart-card surface">
@@ -256,6 +306,7 @@ function signedWeight(value?: number) {
 .bar-chart__plot::before { top: 33%; }
 .bar-chart__plot::after { top: 66%; }
 .bar-chart__bar { position: relative; z-index: 1; width: 70%; min-height: 3px; border-radius: 7px 7px 2px 2px; background: linear-gradient(180deg, #d56d7e 0%, #b94b5d 100%); }
+.bar-chart__bar--storage { background: linear-gradient(180deg, #9abfbc 0%, #668f8c 100%); }
 .bar-chart__bar--empty { background: #eee5e6; }
 .bar-chart__value { position: absolute; z-index: 2; top: 3px; color: var(--bud-color-muted); font-size: 8px; }
 .bar-chart__date, .weight-chart__date { margin-top: 6px; color: var(--bud-color-muted); font-size: 8px; white-space: nowrap; }
