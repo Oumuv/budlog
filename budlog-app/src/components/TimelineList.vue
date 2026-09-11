@@ -83,8 +83,8 @@ function intervalText(item: TimelineItem): string {
 }
 
 .timeline__icon--diaper {
-  color: var(--bud-color-cyan);
-  background: var(--bud-color-cyan-soft);
+  color: #b57c00;
+  background: var(--baby-yellow-soft);
 }
 
 .timeline__icon--milk_storage {
@@ -93,18 +93,18 @@ function intervalText(item: TimelineItem): string {
 }
 
 .timeline__icon--task {
-  color: var(--bud-color-gold);
-  background: var(--bud-color-gold-soft);
+  color: var(--baby-blue);
+  background: var(--baby-blue-soft);
 }
 
 .timeline__icon--weight {
-  color: #476779;
-  background: #eef4f6;
+  color: var(--baby-purple);
+  background: var(--baby-purple-soft);
 }
 
 .timeline__icon--event {
-  color: #72556f;
-  background: #f5eff5;
+  color: var(--baby-green);
+  background: var(--baby-green-soft);
 }
 
 .timeline__body {

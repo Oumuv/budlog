@@ -20,7 +20,7 @@ withDefaults(defineProps<{ size?: "small" | "large" }>(), {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(185, 75, 93, 0.2);
+  border: 1px solid rgba(255, 93, 143, 0.24);
   border-radius: 8px;
   color: var(--bud-color-primary-dark);
   background: var(--bud-color-primary-soft);
@@ -51,7 +51,7 @@ withDefaults(defineProps<{ size?: "small" | "large" }>(), {
   height: 60px;
   color: #ffffff;
   background: var(--bud-color-primary);
-  box-shadow: 0 10px 24px rgba(185, 75, 93, 0.24);
+  box-shadow: 0 10px 24px rgba(255, 93, 143, 0.24);
 }
 
 .brand-mark--large .brand-mark__heart {
