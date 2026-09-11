@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Droplets, Milk, NotebookPen, PackagePlus, Plus, Scale } from "lucide-vue-next";
+import { ChevronLeft, ChevronRight, Droplets, Milk, NotebookPen, PackagePlus, Plus, Scale } from "lucide-vue-next";
+import { NDatePicker } from "naive-ui";
 import { onShow } from "@dcloudio/uni-app";
 import { computed, ref } from "vue";
 import { api } from "../../api";
+import AppLoading from "../../components/AppLoading.vue";
 import AppNav from "../../components/AppNav.vue";
+import AppPage from "../../components/AppPage.vue";
+import ErrorState from "../../components/ErrorState.vue";
 import TimelineList from "../../components/TimelineList.vue";
 import type { Timeline, TimelineItem } from "../../types";
 import { shiftDay, todayKey, toIso, toLocalInput } from "../../utils/date";
@@ -72,7 +76,8 @@ function edit(item: TimelineItem) {
 </script>
 
 <template>
-  <view class="page-shell records-page">
+  <AppPage>
+    <view class="page-shell records-page">
     <view class="records-head">
       <view>
         <text class="page-title">记录</text>
@@ -87,21 +92,16 @@ function edit(item: TimelineItem) {
 
     <view class="date-switch surface">
       <button class="icon-btn" aria-label="前一天" title="前一天" :disabled="date <= calendarMinDateKey" @click="moveDay(-1)"><ChevronLeft :size="21" /></button>
-      <wd-calendar
-        v-model="calendarValue"
+      <NDatePicker
+        v-model:value="calendarValue"
+        class="date-switch__calendar"
         type="date"
-        title="选择记录日期"
+        placeholder="选择记录日期"
         :min-date="calendarMinDate"
         :max-date="calendarMaxDate"
-        root-portal
-        custom-class="date-switch__calendar"
-      >
-        <view class="date-switch__value">
-          <CalendarDays :size="17" />
-          <text class="date-switch__date">{{ date }}</text>
-          <text v-if="date === todayKey()" class="date-switch__today">今天</text>
-        </view>
-      </wd-calendar>
+        :clearable="false"
+        format="yyyy-MM-dd"
+      />
       <button class="icon-btn" aria-label="后一天" title="后一天" :disabled="date >= todayKey()" @click="moveDay(1)"><ChevronRight :size="21" /></button>
     </view>
 
@@ -126,20 +126,13 @@ function edit(item: TimelineItem) {
       <button class="records-backfill" @click="go('/pages/feeding/index')"><Plus :size="16" />补录</button>
     </view>
 
-    <view v-if="loading" class="state-panel surface">
-      <wd-loading color="#b94b5d" />
-      <text class="state-panel__copy">正在读取当天记录</text>
-    </view>
-    <view v-else-if="error" class="state-panel surface">
-      <view class="state-panel__icon records-error"><AlertCircle :size="22" /></view>
-      <text class="state-panel__title">记录加载失败</text>
-      <text class="state-panel__copy">{{ error }}</text>
-      <wd-button type="info" size="medium" @click="load">重新加载</wd-button>
-    </view>
+    <AppLoading v-if="loading" copy="正在读取当天记录" />
+    <ErrorState v-else-if="error" title="记录加载失败" :copy="error" @retry="load" />
     <TimelineList v-else :items="timeline?.items || []" editable @edit="edit" />
 
     <AppNav current="records" />
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>
@@ -209,7 +202,7 @@ function edit(item: TimelineItem) {
   font-size: 11px;
 }
 
-:deep(.date-switch__calendar) {
+.date-switch__calendar {
   width: 100%;
 }
 

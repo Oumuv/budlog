@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { CalendarDays, ChevronLeft, ChevronRight, RefreshCw } from "lucide-vue-next";
+import { NButton } from "naive-ui";
 import { onShow, onUnload } from "@dcloudio/uni-app";
 import { computed, ref } from "vue";
 import { api } from "../../api";
+import AppLoading from "../../components/AppLoading.vue";
+import AppPage from "../../components/AppPage.vue";
+import ErrorState from "../../components/ErrorState.vue";
 import PageHeader from "../../components/PageHeader.vue";
 import type { CalendarItem } from "../../types";
 import { calendarDetailUrl, calendarFilters, calendarGroup, calendarItemLabel, monthGrid, shiftMonth } from "../../utils/calendar";
@@ -113,7 +117,8 @@ function goSettings() {
 </script>
 
 <template>
-  <view class="page-shell page-shell--form calendar-page">
+  <AppPage>
+    <view class="page-shell page-shell--form calendar-page">
     <PageHeader title="育儿日历" back>
       <button class="icon-btn" aria-label="刷新日历" :disabled="loading" @click="load"><RefreshCw :size="19" /></button>
     </PageHeader>
@@ -121,7 +126,7 @@ function goSettings() {
 
     <view v-if="needsSetup" class="state-panel surface">
       <text class="state-panel__title">先添加宝宝资料</text>
-      <wd-button @click="goSettings">前往设置</wd-button>
+      <NButton type="primary" @click="goSettings">前往设置</NButton>
     </view>
     <template v-else>
       <view class="month-toolbar">
@@ -137,15 +142,8 @@ function goSettings() {
         <button v-for="option in calendarFilters" :key="option.value" class="shortcut-chip" :class="{ 'shortcut-chip--active': filter === option.value }" :aria-pressed="filter === option.value" @click="filter = option.value">{{ option.label }}</button>
       </view>
 
-      <view v-if="error" class="state-panel surface">
-        <text class="state-panel__title">日历加载失败</text>
-        <text class="state-panel__copy">{{ error }}</text>
-        <wd-button type="info" @click="load">重新加载</wd-button>
-      </view>
-      <view v-else-if="loading" class="state-panel surface">
-        <wd-loading color="#b94b5d" />
-        <text class="state-panel__copy">正在整理这个月的事项</text>
-      </view>
+      <ErrorState v-if="error" title="日历加载失败" :copy="error" @retry="load" />
+      <AppLoading v-else-if="loading" copy="正在整理这个月的事项" />
       <template v-else>
         <view class="calendar surface">
           <view class="calendar-weekdays"><text v-for="weekday in weekdays" :key="weekday">{{ weekday }}</text></view>
@@ -188,7 +186,8 @@ function goSettings() {
         </view>
       </template>
     </template>
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>
@@ -212,9 +211,9 @@ function goSettings() {
 .day-count { min-height: 12px; color: var(--bud-color-muted); font-size: 9px; }
 .day-item { display: block; overflow: hidden; width: 100%; margin: 3px 0 0; padding: 3px 2px; border-radius: 3px; font-size: 10px; line-height: 15px; text-overflow: ellipsis; text-align: left; white-space: nowrap; }
 .day-more { width: 100%; margin: 0; padding: 0; color: var(--bud-color-muted); background: transparent; font-size: 10px; line-height: 18px; }
-.tone-task { color: var(--bud-color-gold); background: var(--bud-color-gold-soft); }
+.tone-task { color: var(--baby-blue); background: var(--baby-blue-soft); }
 .tone-milestone { color: var(--bud-color-primary-dark); background: var(--bud-color-primary-soft); }
-.tone-event { color: #72556f; background: #f1e8f3; }
+.tone-event { color: var(--baby-green); background: var(--baby-green-soft); }
 .tone-care { color: var(--bud-color-sage); background: var(--bud-color-sage-soft); }
 .calendar-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 10px; border-top: 1px solid var(--bud-color-line-soft); color: var(--bud-color-muted); font-size: 10px; }
 .legend-item { display: inline-flex; align-items: center; gap: 4px; }

@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { AlertCircle, ChartLine, Milk, PackagePlus, RefreshCw, Scale, TrendingUp } from "lucide-vue-next";
+import { ChartLine, Milk, PackagePlus, RefreshCw, Scale, TrendingUp } from "lucide-vue-next";
 import { onShow } from "@dcloudio/uni-app";
 import { computed, ref } from "vue";
 import { api } from "../../api";
+import AppLoading from "../../components/AppLoading.vue";
 import AppNav from "../../components/AppNav.vue";
+import AppPage from "../../components/AppPage.vue";
+import ErrorState from "../../components/ErrorState.vue";
 import type { FeedingRecord, MilkStorageRecord, WeightRecord } from "../../types";
 import { shiftDay, todayKey, toLocalInput } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
@@ -154,7 +157,8 @@ function signedWeight(value?: number) {
 </script>
 
 <template>
-  <view class="page-shell analytics-page">
+  <AppPage>
+    <view class="page-shell analytics-page">
     <view class="analytics-head">
       <view>
         <view class="analytics-head__eyebrow"><ChartLine :size="15" /><text>成长观测</text></view>
@@ -174,16 +178,8 @@ function signedWeight(value?: number) {
       >近 {{ days }} 天</button>
     </view>
 
-    <view v-if="loading" class="state-panel surface">
-      <wd-loading color="#b94b5d" />
-      <text class="state-panel__copy">正在汇总成长数据</text>
-    </view>
-    <view v-else-if="error" class="state-panel surface">
-      <view class="state-panel__icon state-panel__icon--error"><AlertCircle :size="22" /></view>
-      <text class="state-panel__title">趋势暂时无法加载</text>
-      <text class="state-panel__copy">{{ error }}</text>
-      <wd-button type="info" size="medium" @click="load">重新加载</wd-button>
-    </view>
+    <AppLoading v-if="loading" copy="正在汇总成长数据" />
+    <ErrorState v-else-if="error" title="趋势暂时无法加载" :copy="error" @retry="load" />
 
     <template v-else>
       <view class="metric-grid">
@@ -201,7 +197,8 @@ function signedWeight(value?: number) {
         </view>
       </view>
 
-      <view class="chart-card surface">
+      <view class="chart-grid">
+        <view class="chart-card surface">
         <view class="chart-card__head">
           <view>
             <text class="chart-card__title">每日瓶喂奶量</text>
@@ -210,7 +207,7 @@ function signedWeight(value?: number) {
           <text class="chart-card__total">峰值 {{ actualMaxMilk }} ml</text>
         </view>
         <view class="bar-chart">
-          <view v-for="day in milkDays" :key="day.date" class="bar-chart__column">
+          <view v-for="day in milkDays" :key="day.date" class="bar-chart__column" :title="`${day.date}：${day.amount} ml`" :aria-label="`${day.date} 瓶喂 ${day.amount} ml`">
             <view class="bar-chart__plot">
               <text v-if="day.amount" class="bar-chart__value">{{ day.amount }}</text>
               <view class="bar-chart__bar" :class="{ 'bar-chart__bar--empty': !day.amount }" :style="{ height: `${milkBarHeight(day.amount)}%` }" />
@@ -219,9 +216,9 @@ function signedWeight(value?: number) {
           </view>
         </view>
         <view class="chart-footnote"><Milk :size="14" /><text>同期亲喂 {{ totalDirectMinutes }} 分钟</text></view>
-      </view>
+        </view>
 
-      <view class="chart-card surface">
+        <view class="chart-card surface">
         <view class="chart-card__head">
           <view>
             <text class="chart-card__title">每日存奶量</text>
@@ -230,7 +227,7 @@ function signedWeight(value?: number) {
           <text class="chart-card__total">累计 {{ totalStoredMilk }} ml</text>
         </view>
         <view class="bar-chart">
-          <view v-for="day in storageDays" :key="day.date" class="bar-chart__column">
+          <view v-for="day in storageDays" :key="day.date" class="bar-chart__column" :title="`${day.date}：${day.amount} ml`" :aria-label="`${day.date} 存奶 ${day.amount} ml`">
             <view class="bar-chart__plot">
               <text v-if="day.amount" class="bar-chart__value">{{ day.amount }}</text>
               <view class="bar-chart__bar bar-chart__bar--storage" :class="{ 'bar-chart__bar--empty': !day.amount }" :style="{ height: `${storageBarHeight(day.amount)}%` }" />
@@ -239,9 +236,9 @@ function signedWeight(value?: number) {
           </view>
         </view>
         <view class="chart-footnote"><PackagePlus :size="14" /><text>{{ totalStorageCount }} 次存奶 · 日均 {{ avgStoredMilk }} ml · 峰值 {{ actualMaxStoredMilk }} ml</text></view>
-      </view>
+        </view>
 
-      <view class="chart-card surface">
+        <view class="chart-card surface chart-card--weight">
         <view class="chart-card__head">
           <view>
             <text class="chart-card__title">体重增长趋势</text>
@@ -255,7 +252,7 @@ function signedWeight(value?: number) {
             <text>{{ minWeight.toFixed(3) }}</text>
           </view>
           <view class="weight-chart__body">
-            <view v-for="day in weightDays" :key="day.date" class="weight-chart__column">
+            <view v-for="day in weightDays" :key="day.date" class="weight-chart__column" :title="`${day.date}：${day.weight ?? '无记录'}${day.weight === undefined ? '' : ' kg'}`" :aria-label="`${day.date} 体重 ${day.weight ?? '无记录'}`">
               <view class="weight-chart__plot">
                 <text v-if="day.weight !== undefined" class="weight-chart__value">{{ day.weight.toFixed(2) }}</text>
                 <view class="weight-chart__bar" :class="{ 'weight-chart__bar--empty': day.weight === undefined }" :style="{ height: `${weightBarHeight(day.weight)}%` }" />
@@ -265,15 +262,17 @@ function signedWeight(value?: number) {
           </view>
         </view>
         <view v-else class="chart-empty"><Scale :size="20" /><text>这个时间段还没有体重记录</text></view>
+        </view>
       </view>
     </template>
 
     <AppNav current="analytics" />
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>
-.analytics-page { padding-bottom: 18px; }
+.analytics-page { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
 .analytics-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .analytics-head__eyebrow { display: flex; align-items: center; gap: 5px; color: var(--bud-color-primary); font-size: 12px; font-weight: 700; }
 .analytics-head__title, .analytics-head__sub { display: block; }
@@ -286,8 +285,8 @@ function signedWeight(value?: number) {
 .state-panel__icon--error { color: #a33e43; background: var(--bud-color-coral-soft); }
 .metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
 .metric-card { min-width: 0; padding: 15px; }
-.metric-card__icon { display: flex; width: 34px; height: 34px; align-items: center; justify-content: center; margin-bottom: 12px; border-radius: 10px; color: #a64053; background: #fff0f2; }
-.metric-card__icon--weight { color: #537073; background: #edf5f4; }
+.metric-card__icon { display: flex; width: 34px; height: 34px; align-items: center; justify-content: center; margin-bottom: 12px; border-radius: 8px; color: var(--baby-blue); background: var(--baby-blue-soft); }
+.metric-card__icon--weight { color: var(--baby-purple); background: var(--baby-purple-soft); }
 .metric-card__label, .metric-card__value, .metric-card__meta { display: block; }
 .metric-card__label { color: var(--bud-color-muted); font-size: 11px; }
 .metric-card__value { margin-top: 3px; overflow: hidden; font-size: 23px; line-height: 30px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
@@ -302,24 +301,31 @@ function signedWeight(value?: number) {
 .bar-chart { display: flex; height: 190px; align-items: stretch; gap: 5px; overflow-x: auto; padding: 6px 1px 0; }
 .bar-chart__column { display: flex; min-width: 34px; flex: 1 0 34px; flex-direction: column; align-items: center; }
 .bar-chart__plot { position: relative; display: flex; width: 100%; height: 154px; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--bud-color-line); }
-.bar-chart__plot::before, .bar-chart__plot::after { position: absolute; right: 0; left: 0; border-top: 1px dashed #f0e4e5; content: ""; }
+.bar-chart__plot::before, .bar-chart__plot::after { position: absolute; right: 0; left: 0; border-top: 1px dashed var(--bud-color-line-soft); content: ""; }
 .bar-chart__plot::before { top: 33%; }
 .bar-chart__plot::after { top: 66%; }
-.bar-chart__bar { position: relative; z-index: 1; width: 70%; min-height: 3px; border-radius: 7px 7px 2px 2px; background: linear-gradient(180deg, #d56d7e 0%, #b94b5d 100%); }
-.bar-chart__bar--storage { background: linear-gradient(180deg, #9abfbc 0%, #668f8c 100%); }
-.bar-chart__bar--empty { background: #eee5e6; }
-.bar-chart__value { position: absolute; z-index: 2; top: 3px; color: var(--bud-color-muted); font-size: 8px; }
-.bar-chart__date, .weight-chart__date { margin-top: 6px; color: var(--bud-color-muted); font-size: 8px; white-space: nowrap; }
+.bar-chart__bar { position: relative; z-index: 1; width: 70%; min-height: 3px; border-radius: 7px 7px 2px 2px; background: var(--baby-blue); }
+.bar-chart__bar--storage { background: var(--baby-cyan); }
+.bar-chart__bar--empty { background: var(--bud-color-line); }
+.bar-chart__value { position: absolute; z-index: 2; top: 3px; color: var(--bud-color-body); font-size: 10px; }
+.bar-chart__date, .weight-chart__date { margin-top: 6px; color: var(--bud-color-muted); font-size: 10px; white-space: nowrap; }
 .chart-footnote { display: flex; align-items: center; gap: 5px; margin-top: 8px; color: var(--bud-color-muted); font-size: 10px; }
-.trend-badge { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; padding: 5px 7px; border-radius: 999px; color: #537073; background: #edf5f4; font-size: 10px; font-weight: 700; }
+.trend-badge { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; padding: 5px 7px; border-radius: 999px; color: var(--baby-purple); background: var(--baby-purple-soft); font-size: 10px; font-weight: 700; }
 .weight-chart { display: flex; height: 190px; gap: 7px; }
 .weight-chart__scale { display: flex; width: 36px; flex: 0 0 36px; flex-direction: column; justify-content: space-between; padding: 12px 0 25px; color: var(--bud-color-muted); font-size: 8px; text-align: right; }
 .weight-chart__body { display: flex; min-width: 0; flex: 1; gap: 5px; overflow-x: auto; }
 .weight-chart__column { display: flex; min-width: 34px; flex: 1 0 34px; flex-direction: column; align-items: center; }
 .weight-chart__plot { position: relative; display: flex; width: 100%; height: 154px; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--bud-color-line); background: repeating-linear-gradient(to bottom, transparent 0, transparent 49px, #f4ecec 50px); }
-.weight-chart__bar { width: 42%; min-height: 3px; border-radius: 8px 8px 2px 2px; background: linear-gradient(180deg, #8eb5b3 0%, #5d8583 100%); }
-.weight-chart__bar--empty { height: 2px !important; background: #eee5e6; }
-.weight-chart__value { position: absolute; top: 3px; color: #537073; font-size: 8px; font-weight: 700; }
+.weight-chart__bar { width: 42%; min-height: 3px; border-radius: 8px 8px 2px 2px; background: var(--baby-purple); }
+.weight-chart__bar--empty { height: 2px !important; background: var(--bud-color-line); }
+.weight-chart__value { position: absolute; top: 3px; color: var(--baby-purple); font-size: 10px; font-weight: 700; }
 .chart-empty { display: flex; min-height: 150px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--bud-color-muted); font-size: 12px; }
 @media (max-width: 380px) { .metric-grid { grid-template-columns: 1fr; } }
+@media (min-width: 960px) {
+  .analytics-page { width: min(1180px, calc(100% - 48px)); }
+  .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .chart-card { margin-bottom: 0; }
+  .chart-card--weight { grid-column: 1 / -1; }
+}
 </style>
