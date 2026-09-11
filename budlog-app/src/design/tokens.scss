@@ -1,0 +1,53 @@
+:root,
+page,
+body {
+  --baby-primary: #ff5d8f;
+  --baby-primary-hover: #ff759f;
+  --baby-primary-pressed: #e9477b;
+  --baby-primary-soft: #fff0f5;
+  --baby-blue: #4d8dff;
+  --baby-blue-soft: #edf5ff;
+  --baby-cyan: #20b8c7;
+  --baby-cyan-soft: #eafcff;
+  --baby-green: #3dbb70;
+  --baby-green-soft: #edfff3;
+  --baby-yellow: #e5a51f;
+  --baby-yellow-soft: #fff8e6;
+  --baby-purple: #7d63eb;
+  --baby-purple-soft: #f3efff;
+  --baby-orange: #f27b42;
+  --baby-orange-soft: #fff2ea;
+  --baby-danger: #d9465f;
+  --baby-danger-soft: #fff0f2;
+
+  --bg-page: #f7f9fc;
+  --bg-card: #ffffff;
+  --bg-elevated: #ffffff;
+  --text-primary: #202533;
+  --text-secondary: #6f7787;
+  --text-tertiary: #929bad;
+  --border-light: #e8edf4;
+  --divider: #eef1f5;
+
+  /* Compatibility aliases keep existing page CSS on the shared palette. */
+  --bud-color-ink: var(--text-primary);
+  --bud-color-body: var(--text-secondary);
+  --bud-color-muted: var(--text-tertiary);
+  --bud-color-line: var(--border-light);
+  --bud-color-line-soft: var(--divider);
+  --bud-color-canvas: var(--bg-page);
+  --bud-color-surface: var(--bg-card);
+  --bud-color-primary: var(--baby-primary);
+  --bud-color-primary-dark: #c93669;
+  --bud-color-primary-soft: var(--baby-primary-soft);
+  --bud-color-coral: #f05f70;
+  --bud-color-coral-soft: #fff0f2;
+  --bud-color-sage: var(--baby-green);
+  --bud-color-sage-soft: var(--baby-green-soft);
+  --bud-color-cyan: var(--baby-cyan);
+  --bud-color-cyan-soft: var(--baby-cyan-soft);
+  --bud-color-gold: #b57c00;
+  --bud-color-gold-soft: var(--baby-yellow-soft);
+  --bud-shadow-sm: 0 4px 16px rgba(45, 55, 72, 0.07);
+  --bud-shadow-md: 0 16px 40px rgba(45, 55, 72, 0.12);
+}

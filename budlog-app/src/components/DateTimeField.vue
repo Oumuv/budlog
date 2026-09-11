@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CalendarClock, ChevronRight } from "lucide-vue-next";
+import { NDatePicker } from "naive-ui";
 import { computed, ref } from "vue";
 import { nowLocalInput, toIso, toLocalInput, todayKey } from "../utils/date";
 
@@ -73,23 +73,18 @@ function shortcutActive(offsetMinutes: number) {
 
 <template>
   <view class="date-time-field">
-    <wd-datetime-picker
-      v-model="pickerValue"
+    <NDatePicker
+      v-model:value="pickerValue"
+      class="date-time-field__picker"
       type="datetime"
-      :title="title"
+      :placeholder="title"
       :min-date="resolvedMinDate"
       :max-date="resolvedMaxDate"
-      :z-index="60"
-      root-portal
-      custom-class="date-time-field__picker"
-      @open="refreshCurrentBoundary"
-    >
-      <view class="date-time-field__trigger">
-        <view class="date-time-field__icon"><CalendarClock :size="19" /></view>
-        <text class="date-time-field__value">{{ displayValue }}</text>
-        <ChevronRight class="date-time-field__arrow" :size="18" />
-      </view>
-    </wd-datetime-picker>
+      :clearable="false"
+      format="yyyy-MM-dd HH:mm"
+      @focus="refreshCurrentBoundary"
+    />
+    <text class="date-time-field__summary">{{ displayValue }}</text>
     <view v-if="quickRecord" class="shortcut-row date-time-field__shortcuts">
       <button
         v-for="shortcut in recordShortcuts"
@@ -105,48 +100,16 @@ function shortcutActive(offsetMinutes: number) {
 </template>
 
 <style scoped>
-.date-time-field__trigger {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 18px;
-  align-items: center;
-  min-height: 50px;
-  padding: 0 13px 0 10px;
-  border: 1px solid var(--wot-color-border);
-  border-radius: 10px;
-  background: #ffffff;
-  transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+.date-time-field__picker {
+  width: 100%;
 }
 
-.date-time-field__trigger:active {
-  border-color: rgba(185, 75, 93, 0.5);
-  background: #fffafa;
-  box-shadow: 0 0 0 3px rgba(185, 75, 93, 0.08);
-}
-
-.date-time-field__icon {
-  display: flex;
-  width: 30px;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  color: var(--bud-color-primary);
-  background: var(--bud-color-primary-soft);
-}
-
-.date-time-field__value {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--bud-color-ink);
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.date-time-field__arrow {
+.date-time-field__summary {
+  display: block;
+  margin-top: 6px;
   color: var(--bud-color-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .date-time-field__shortcuts {

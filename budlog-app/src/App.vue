@@ -9,67 +9,11 @@ onHide(() => stopReminderLoop());
 </script>
 
 <style lang="scss">
+@use "./design/tokens.scss";
+@use "./design/effects.scss";
+
 page,
 body {
-  --bud-color-ink: #30292b;
-  --bud-color-body: #5c4f52;
-  --bud-color-muted: #7d6c6f;
-  --bud-color-line: #eadcdd;
-  --bud-color-line-soft: #f4ebea;
-  --bud-color-canvas: #fff8f7;
-  --bud-color-surface: #ffffff;
-  --bud-color-primary: #b94b5d;
-  --bud-color-primary-dark: #873342;
-  --bud-color-primary-soft: #fbe7eb;
-  --bud-color-coral: #c5655e;
-  --bud-color-coral-soft: #fce9e6;
-  --bud-color-sage: #497c69;
-  --bud-color-sage-soft: #e4f1eb;
-  --bud-color-cyan: #39798b;
-  --bud-color-cyan-soft: #e3f1f4;
-  --bud-color-gold: #9a6c1c;
-  --bud-color-gold-soft: #fff1cf;
-  --bud-shadow-sm: 0 3px 12px rgba(112, 70, 76, 0.07);
-  --bud-shadow-md: 0 12px 32px rgba(112, 70, 76, 0.12);
-  --wot-color-theme: var(--bud-color-primary);
-  --wot-color-success: var(--bud-color-sage);
-  --wot-color-warning: var(--bud-color-gold);
-  --wot-color-danger: #b34747;
-  --wot-color-title: var(--bud-color-ink);
-  --wot-color-content: var(--bud-color-body);
-  --wot-color-secondary: #746568;
-  --wot-color-aid: var(--bud-color-muted);
-  --wot-color-tip: #aa999c;
-  --wot-color-border: #dfcecf;
-  --wot-color-border-light: var(--bud-color-line-soft);
-  --wot-color-bg: var(--bud-color-canvas);
-  --wot-button-primary-bg-color: var(--bud-color-primary);
-  --wot-calendar-active-color: var(--bud-color-primary);
-  --wot-calendar-range-color: var(--bud-color-primary-soft);
-  --wot-picker-toolbar-finish-color: var(--bud-color-primary);
-  --wot-switch-active-color: var(--bud-color-primary);
-  --wot-button-medium-height: 40px;
-  --wot-button-medium-radius: 10px;
-  --wot-button-large-height: 48px;
-  --wot-button-large-radius: 12px;
-  --wot-button-info-bg-color: #f7efef;
-  --wot-button-info-color: var(--bud-color-body);
-  --wot-button-info-plain-border-color: var(--bud-color-line);
-  --wot-button-info-plain-normal-color: var(--bud-color-body);
-  --wot-input-inner-height: 46px;
-  --wot-input-padding: 12px 13px;
-  --wot-input-bg: var(--bud-color-surface);
-  --wot-textarea-bg: var(--bud-color-surface);
-  --wot-segmented-radius: 10px;
-  --wot-cell-tap-bg: var(--bud-color-primary-soft);
-  --wot-input-number-height: 42px;
-  --wot-input-number-btn-width: 44px;
-  --wot-input-number-input-width: 76px;
-  --wot-input-number-radius: 10px;
-  --wot-input-number-fs: 17px;
-  --wot-input-number-icon-size: 18px;
-  --wot-input-number-icon-color: var(--bud-color-primary-dark);
-  --wot-input-number-border-color: var(--bud-color-line);
   min-height: 100%;
   background: var(--bud-color-canvas);
   color: var(--bud-color-ink);
@@ -138,30 +82,6 @@ button::after {
   border: 1px solid var(--bud-color-line);
   border-radius: 8px;
   box-shadow: var(--bud-shadow-sm);
-}
-
-.wd-button {
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.wd-button.is-round {
-  border-radius: 12px !important;
-}
-
-.wd-button.is-primary:not(.is-plain) {
-  box-shadow: 0 7px 16px rgba(185, 75, 93, 0.22);
-}
-
-.wd-button.is-error.is-plain {
-  background: #fffafa;
-}
-
-.wd-button__text {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
 }
 
 .btn {
@@ -242,7 +162,7 @@ button::after {
   width: 100%;
   min-height: 46px;
   padding: 11px 12px;
-  border: 1px solid var(--wot-color-border);
+  border: 1px solid var(--bud-color-line);
   border-radius: 10px;
   color: var(--bud-color-ink);
   background: var(--bud-color-surface);
@@ -342,48 +262,23 @@ textarea.field__control {
   line-height: 20px;
 }
 
-.wot-control {
+.form-control {
   width: 100%;
 }
 
-.wot-control.wd-input,
-.wot-control.wd-textarea {
-  border: 1px solid var(--wot-color-border);
-  border-radius: 10px;
-  background: var(--bud-color-surface);
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
-}
-
-.wot-control.wd-input {
-  box-sizing: border-box;
-  min-height: 46px;
-  padding: 10px 12px;
-}
-
-.wot-control.wd-input:focus-within,
-.wot-control.wd-textarea:focus-within {
-  border-color: rgba(185, 75, 93, 0.72);
-  box-shadow: 0 0 0 3px rgba(185, 75, 93, 0.1);
-}
-
-.wot-control.wd-input.is-error,
-.wot-control.wd-textarea.is-error {
-  border-color: var(--bud-color-coral);
-}
-
-.wot-segmented {
-  width: 100%;
-}
-
-.wot-action-row {
+.form-actions {
   display: flex;
   gap: 10px;
   margin-top: 24px;
 }
 
-.wot-action-row > * {
+.form-actions > * {
   min-width: 0;
   flex: 1;
+}
+
+.n-button .lucide {
+  margin-right: 6px;
 }
 
 .shortcut-row {
@@ -403,7 +298,7 @@ textarea.field__control {
   border: 1px solid var(--bud-color-line);
   border-radius: 17px;
   color: var(--bud-color-body);
-  background: #fffdfd;
+  background: var(--bud-color-surface);
   font-size: 13px;
   font-weight: 650;
   line-height: 18px;
@@ -415,7 +310,7 @@ textarea.field__control {
 }
 
 .shortcut-chip--active {
-  border-color: rgba(185, 75, 93, 0.38);
+  border-color: rgba(255, 93, 143, 0.42);
   color: var(--bud-color-primary-dark);
   background: var(--bud-color-primary-soft);
 }
