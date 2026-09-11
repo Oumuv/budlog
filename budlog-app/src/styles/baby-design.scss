@@ -1,0 +1,37 @@
+/* Baby Design System - UI redesign foundation */
+:root {
+  --baby-primary: #ff9fb2;
+  --baby-secondary: #8fd3fe;
+  --baby-success: #8ed081;
+  --baby-warning: #ffd166;
+  --baby-bg: #fff8fa;
+  --baby-card: #ffffff;
+  --baby-text: #333333;
+  --baby-sub-text: #8a8a8a;
+  --baby-radius-lg: 24rpx;
+  --baby-radius-md: 16rpx;
+}
+
+.baby-page {
+  min-height: 100vh;
+  background: var(--baby-bg);
+  color: var(--baby-text);
+  padding: 32rpx;
+}
+
+.baby-card {
+  background: var(--baby-card);
+  border-radius: var(--baby-radius-lg);
+  padding: 28rpx;
+  box-shadow: 0 8rpx 30rpx rgba(0,0,0,.04);
+}
+
+.baby-title {
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.baby-subtitle {
+  color: var(--baby-sub-text);
+  font-size: 26rpx;
+}
