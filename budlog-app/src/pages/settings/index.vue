@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { AlertCircle, CalendarDays, Check, Download, LogOut, MonitorSmartphone, Pencil, Plus, Save, Trash2, X } from "lucide-vue-next";
+import { CalendarDays, Check, Download, LogOut, MonitorSmartphone, Pencil, Plus, Save, Trash2, X } from "lucide-vue-next";
+import { NButton, NInput, NInputNumber, NSwitch } from "naive-ui";
 import { onShow } from "@dcloudio/uni-app";
 import { reactive, ref } from "vue";
 import { api } from "../../api";
+import AppLoading from "../../components/AppLoading.vue";
 import AppNav from "../../components/AppNav.vue";
+import AppPage from "../../components/AppPage.vue";
 import DateTimeField from "../../components/DateTimeField.vue";
+import ErrorState from "../../components/ErrorState.vue";
 import type { AppSetting, Milestone } from "../../types";
 import { clearPassword } from "../../utils/auth";
 import { formatDate, nowLocalInput, setAppTimezone, toIso, toLocalInput, uuid } from "../../utils/date";
@@ -200,7 +204,8 @@ async function installPwa() {
 </script>
 
 <template>
-  <view class="page-shell settings-page">
+  <AppPage>
+    <view class="page-shell settings-page">
     <view class="settings-head">
       <view>
         <text class="page-title">设置</text>
@@ -209,16 +214,8 @@ async function installPwa() {
       <button class="icon-btn settings-logout" aria-label="退出访问" title="退出访问" @click="logout"><LogOut :size="20" /></button>
     </view>
 
-    <view v-if="loading" class="state-panel surface settings-state">
-      <wd-loading color="#b94b5d" />
-      <text class="state-panel__copy">正在加载设置</text>
-    </view>
-    <view v-else-if="error" class="state-panel surface settings-state">
-      <view class="state-panel__icon settings-error"><AlertCircle :size="22" /></view>
-      <text class="state-panel__title">设置加载失败</text>
-      <text class="state-panel__copy">{{ error }}</text>
-      <wd-button type="info" size="medium" @click="load">重新加载</wd-button>
-    </view>
+    <AppLoading v-if="loading" class="settings-state" copy="正在加载设置" />
+    <ErrorState v-else-if="error" class="settings-state" title="设置加载失败" :copy="error" @retry="load" />
 
     <template v-else>
       <view class="section settings-section">
@@ -226,7 +223,7 @@ async function installPwa() {
         <view class="settings-form surface">
           <view class="field">
             <text class="field__label">昵称</text>
-            <wd-input v-model="profile.name" custom-class="wot-control" no-border clearable :maxlength="50" placeholder="宝宝昵称" />
+            <NInput v-model:value="profile.name" clearable :maxlength="50" placeholder="宝宝昵称" />
           </view>
           <view class="field">
             <text class="field__label">出生时间</text>
@@ -234,11 +231,11 @@ async function installPwa() {
           </view>
           <view class="field">
             <text class="field__label">备注</text>
-            <wd-textarea v-model="profile.note" custom-class="wot-control" no-border :maxlength="500" placeholder="可选" />
+            <NInput v-model:value="profile.note" type="textarea" :maxlength="500" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="可选" />
           </view>
-          <wd-button :round="false" type="primary" size="large" block :loading="savingProfile" @click="saveProfile">
+          <NButton type="primary" size="large" block :loading="savingProfile" @click="saveProfile">
             <Save :size="18" />{{ savingProfile ? "保存中" : "保存宝宝资料" }}
-          </wd-button>
+          </NButton>
         </view>
       </view>
 
@@ -248,14 +245,13 @@ async function installPwa() {
           <view class="field">
             <text class="field__label">默认喂奶间隔（分钟）</text>
             <view class="interval-stepper">
-              <wd-input-number
-                v-model="setting.defaultFeedingIntervalMin"
+              <NInputNumber
+                v-model:value="setting.defaultFeedingIntervalMin"
                 :min="30"
                 :max="720"
                 :step="30"
                 :precision="0"
-                long-press
-                input-type="digit"
+                button-placement="both"
               />
               <text class="interval-stepper__unit">分钟</text>
             </view>
@@ -276,18 +272,18 @@ async function installPwa() {
               <text class="toggle-row__title">提醒声音</text>
               <text class="toggle-row__copy">任务到期时播放提示音</text>
             </view>
-            <wd-switch v-model="setting.reminderSoundEnabled" />
+            <NSwitch v-model:value="setting.reminderSoundEnabled" />
           </view>
           <view class="toggle-row">
             <view>
               <text class="toggle-row__title">振动提醒</text>
               <text class="toggle-row__copy">支持时同步触发设备振动</text>
             </view>
-            <wd-switch v-model="setting.reminderVibrateEnabled" />
+            <NSwitch v-model:value="setting.reminderVibrateEnabled" />
           </view>
-          <wd-button :round="false" type="primary" size="large" plain block :loading="savingSettings" @click="saveSetting">
+          <NButton type="primary" size="large" secondary block :loading="savingSettings" @click="saveSetting">
             <Save :size="18" />{{ savingSettings ? "保存中" : "保存记录偏好" }}
-          </wd-button>
+          </NButton>
         </view>
       </view>
 
@@ -300,9 +296,9 @@ async function installPwa() {
             <text class="pwa-install__status">{{ pwaStandalone ? "桌面模式" : pwaInstallAvailable ? "可以安装" : "添加到主屏幕" }}</text>
           </view>
           <view v-if="pwaStandalone" class="pwa-install__installed"><Check :size="16" />已安装</view>
-          <wd-button v-else :round="false" type="primary" size="medium" plain @click="installPwa">
+          <NButton v-else type="primary" size="medium" secondary @click="installPwa">
             <Download :size="17" />安装
-          </wd-button>
+          </NButton>
         </view>
       </view>
 
@@ -343,7 +339,7 @@ async function installPwa() {
         </view>
         <view class="field">
           <text class="field__label">名称</text>
-          <wd-input v-model="milestoneForm.title" custom-class="wot-control" no-border clearable :maxlength="100" placeholder="例如：百日纪念" />
+          <NInput v-model:value="milestoneForm.title" clearable :maxlength="100" placeholder="例如：百日纪念" />
         </view>
         <view class="field">
           <text class="field__label">目标时间</text>
@@ -351,14 +347,15 @@ async function installPwa() {
         </view>
         <view class="field">
           <text class="field__label">备注</text>
-          <wd-textarea v-model="milestoneForm.note" custom-class="wot-control" no-border :maxlength="500" placeholder="可选" />
+          <NInput v-model:value="milestoneForm.note" type="textarea" :maxlength="500" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="可选" />
         </view>
-        <wd-button :round="false" type="primary" size="large" block @click="saveMilestone"><Save :size="18" />保存</wd-button>
+        <NButton type="primary" size="large" block @click="saveMilestone"><Save :size="18" />保存</NButton>
       </view>
     </view>
 
     <AppNav current="settings" />
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>

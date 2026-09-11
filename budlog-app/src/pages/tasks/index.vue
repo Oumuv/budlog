@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { AlertCircle, CalendarDays, Check, ClipboardCheck, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-vue-next";
+import { CalendarDays, Check, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-vue-next";
+import { NButton } from "naive-ui";
 import { onShow } from "@dcloudio/uni-app";
 import { computed, ref } from "vue";
 import { api } from "../../api";
+import AppLoading from "../../components/AppLoading.vue";
 import AppNav from "../../components/AppNav.vue";
+import AppPage from "../../components/AppPage.vue";
+import EmptyState from "../../components/EmptyState.vue";
+import ErrorState from "../../components/ErrorState.vue";
+import SegmentedControl from "../../components/SegmentedControl.vue";
 import type { TaskStatus, TodoTask } from "../../types";
 import { formatDateTime } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
@@ -80,7 +86,8 @@ function statusLabel(status: TaskStatus) {
 </script>
 
 <template>
-  <view class="page-shell tasks-page">
+  <AppPage>
+    <view class="page-shell tasks-page">
     <view class="tasks-head">
       <view>
         <text class="page-title">任务</text>
@@ -88,26 +95,16 @@ function statusLabel(status: TaskStatus) {
       </view>
       <view class="tasks-head__actions">
         <button class="icon-btn" aria-label="育儿日历" title="查看日历" @click="go('/pages/calendar/index')"><CalendarDays :size="21" /></button>
-        <wd-button :round="false" size="medium" custom-class="tasks-add" @click="go('/pages/task-edit/index')">
+        <NButton type="primary" size="medium" @click="go('/pages/task-edit/index')">
           <Plus :size="17" />新增
-        </wd-button>
+        </NButton>
       </view>
     </view>
 
-    <wd-segmented v-model:value="filter" :options="filterOptions" size="large" custom-class="task-filters">
-      <template #label="{ option }">{{ option.label }}</template>
-    </wd-segmented>
+    <SegmentedControl v-model="filter" :options="filterOptions" />
 
-    <view v-if="loading" class="state-panel surface task-state">
-      <wd-loading color="#b94b5d" />
-      <text class="state-panel__copy">正在整理任务</text>
-    </view>
-    <view v-else-if="error" class="state-panel surface task-state">
-      <view class="state-panel__icon task-error"><AlertCircle :size="22" /></view>
-      <text class="state-panel__title">任务加载失败</text>
-      <text class="state-panel__copy">{{ error }}</text>
-      <wd-button type="info" size="medium" @click="load">重新加载</wd-button>
-    </view>
+    <AppLoading v-if="loading" class="task-state" copy="正在整理任务" />
+    <ErrorState v-else-if="error" class="task-state" title="任务加载失败" :copy="error" @retry="load" />
     <view v-else-if="filtered.length" class="task-list">
       <view v-for="task in filtered" :key="task.id" class="task-card surface">
         <view class="task-card__top">
@@ -129,15 +126,13 @@ function statusLabel(status: TaskStatus) {
         </view>
       </view>
     </view>
-    <view v-else class="state-panel surface task-state">
-      <view class="state-panel__icon"><ClipboardCheck :size="22" /></view>
-      <text class="state-panel__title">当前没有任务</text>
-      <text class="state-panel__copy">新增提醒后，会按到期时间集中显示在这里</text>
-      <wd-button :round="false" type="primary" size="medium" @click="go('/pages/task-edit/index')">创建任务</wd-button>
-    </view>
+    <EmptyState v-else class="task-state" title="当前没有任务" copy="新增提醒后，会按到期时间集中显示在这里">
+      <NButton type="primary" size="medium" @click="go('/pages/task-edit/index')">创建任务</NButton>
+    </EmptyState>
 
     <AppNav current="tasks" />
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>
@@ -148,14 +143,6 @@ function statusLabel(status: TaskStatus) {
   justify-content: space-between;
   min-height: 48px;
   margin-bottom: 20px;
-}
-
-.task-filters {
-  --wot-segmented-item-bg-color: #f6eeee;
-  --wot-segmented-item-color: var(--bud-color-muted);
-  --wot-segmented-item-acitve-bg: #ffffff;
-  width: 100%;
-  border: 1px solid var(--bud-color-line);
 }
 
 .task-state {
