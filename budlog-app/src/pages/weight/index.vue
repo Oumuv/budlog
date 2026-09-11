@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { Save, Trash2 } from "lucide-vue-next";
+import { NButton, NInput, NInputNumber } from "naive-ui";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
-import { nextTick, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { api } from "../../api";
 import DateTimeField from "../../components/DateTimeField.vue";
+import AppLoading from "../../components/AppLoading.vue";
+import AppPage from "../../components/AppPage.vue";
 import PageHeader from "../../components/PageHeader.vue";
 import type { WeightRecord } from "../../types";
 import { nowLocalInput, shiftDay, toIso, toLocalInput, uuid } from "../../utils/date";
@@ -21,6 +24,10 @@ const form = reactive({
   measuredAt: nowLocalInput(),
   weightKg: "",
   note: "",
+});
+const weightValue = computed<number | null>({
+  get: () => form.weightKg === "" ? null : Number(form.weightKg),
+  set: (value) => { form.weightKg = value === null ? "" : String(value); },
 });
 
 watch(form, () => {
@@ -160,13 +167,11 @@ function remove() {
 </script>
 
 <template>
-  <view class="page-shell page-shell--form weight-page">
+  <AppPage>
+    <view class="page-shell page-shell--form weight-page">
     <PageHeader :title="recordId ? '编辑体重记录' : '记录体重'" back />
 
-    <view v-if="loading" class="state-panel surface">
-      <wd-loading color="#b94b5d" />
-      <text class="state-panel__copy">正在加载体重记录</text>
-    </view>
+    <AppLoading v-if="loading" copy="正在加载体重记录" />
 
     <view v-else class="weight-form surface">
       <view class="field">
@@ -177,15 +182,13 @@ function remove() {
       <view class="field">
         <text class="field__label">体重（kg）</text>
         <view class="weight-stepper">
-          <wd-input-number
-            v-model="form.weightKg"
+          <NInputNumber
+            v-model:value="weightValue"
             :min="0.1"
             :max="100"
             :step="0.01"
             :precision="3"
-            allow-null
-            long-press
-            input-type="digit"
+            button-placement="both"
             placeholder="0.000"
           />
           <text class="weight-stepper__unit">kg</text>
@@ -194,15 +197,16 @@ function remove() {
 
       <view class="field">
         <text class="field__label">备注</text>
-        <wd-textarea v-model="form.note" custom-class="wot-control" no-border :maxlength="500" placeholder="可选" />
+        <NInput v-model:value="form.note" type="textarea" :maxlength="500" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="可选" />
       </view>
 
-      <view class="wot-action-row">
-        <wd-button v-if="recordId" :round="false" type="error" size="large" plain block :loading="deleting" @click="remove"><Trash2 :size="18" />删除</wd-button>
-        <wd-button :round="false" type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : recordId ? "保存修改" : "记录体重" }}</wd-button>
+      <view class="form-actions">
+        <NButton v-if="recordId" type="error" size="large" secondary block :loading="deleting" @click="remove"><Trash2 :size="18" />删除</NButton>
+        <NButton type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : recordId ? "保存修改" : "记录体重" }}</NButton>
       </view>
     </view>
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>

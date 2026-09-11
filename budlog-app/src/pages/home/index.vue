@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { AlertCircle, Baby, BellRing, CalendarDays, Check, ChevronRight, Droplets, Heart, Milk, NotebookPen, PackagePlus, Plus, Scale, Sparkles, Timer } from "lucide-vue-next";
+import { Baby, BellRing, CalendarDays, Check, ChevronRight, Droplets, Heart, Milk, NotebookPen, PackagePlus, Plus, Scale, Sparkles, Timer } from "lucide-vue-next";
+import { NButton } from "naive-ui";
 import { onHide, onShow } from "@dcloudio/uni-app";
 import { computed, onUnmounted, ref } from "vue";
 import { api } from "../../api";
+import AppLoading from "../../components/AppLoading.vue";
 import AppNav from "../../components/AppNav.vue";
+import AppPage from "../../components/AppPage.vue";
 import BrandMark from "../../components/BrandMark.vue";
+import ErrorState from "../../components/ErrorState.vue";
 import TimelineList from "../../components/TimelineList.vue";
 import type { Dashboard, TimelineItem } from "../../types";
 import { formatDate, formatDateTime, formatDuration, formatTime, setAppTimezone, todayKey } from "../../utils/date";
@@ -92,7 +96,8 @@ function milestoneLabel(days: number) {
 </script>
 
 <template>
-  <view class="page-shell home-page">
+  <AppPage>
+    <view class="page-shell home-page">
     <view class="home-head">
       <view class="home-head__brand-lockup">
         <BrandMark />
@@ -107,21 +112,13 @@ function milestoneLabel(days: number) {
       </button>
     </view>
 
-    <view v-if="loading" class="state-panel surface">
-      <wd-loading color="#b94b5d" />
-      <text class="state-panel__copy">正在整理今天的记录</text>
-    </view>
-    <view v-else-if="error" class="state-panel surface">
-      <view class="state-panel__icon state-panel__icon--error"><AlertCircle :size="22" /></view>
-      <text class="state-panel__title">首页暂时无法加载</text>
-      <text class="state-panel__copy">{{ error }}</text>
-      <wd-button type="info" size="medium" @click="load">重新加载</wd-button>
-    </view>
+    <AppLoading v-if="loading" copy="正在整理今天的记录" />
+    <ErrorState v-else-if="error" title="首页暂时无法加载" :copy="error" @retry="load" />
     <view v-else-if="dashboard && !dashboard.configured" class="state-panel surface setup-state">
       <view class="state-panel__icon"><Baby :size="22" /></view>
       <text class="state-panel__title">先添加宝宝资料</text>
       <text class="state-panel__copy">完成昵称和出生时间设置后，即可开始记录日常</text>
-      <wd-button type="primary" size="large" @click="redirect('/pages/settings/index')">开始设置</wd-button>
+      <NButton type="primary" size="large" @click="redirect('/pages/settings/index')">开始设置</NButton>
     </view>
 
     <template v-else-if="dashboard?.baby">
@@ -257,7 +254,8 @@ function milestoneLabel(days: number) {
     </template>
 
     <AppNav current="home" />
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>
@@ -336,8 +334,8 @@ function milestoneLabel(days: number) {
 
 .baby-overview {
   padding: 18px;
-  border-color: #ecd6d9;
-  background: #fffdfd;
+  border-color: #ffd4e2;
+  background: #ffffff;
 }
 
 .baby-overview__top {
@@ -424,9 +422,9 @@ function milestoneLabel(days: number) {
   gap: 10px;
   margin-top: 10px;
   padding: 13px 14px;
-  border: 1px solid #f0dca6;
+  border: 1px solid #ffe3a5;
   border-radius: 8px;
-  background: #fffbf0;
+  background: var(--baby-yellow-soft);
 }
 
 .milestone-band__icon {
@@ -578,12 +576,12 @@ function milestoneLabel(days: number) {
 }
 
 .quick-action:active { transform: translateY(1px) scale(0.97); box-shadow: none; }
-.quick-action--direct { color: #99463f; border-color: #f0d1cc; background: var(--bud-color-coral-soft); }
-.quick-action--bottle { color: #356957; border-color: #cfe4da; background: var(--bud-color-sage-soft); }
-.quick-action--storage { color: #47705e; border-color: #cfe4da; background: #eef7f2; }
-.quick-action--diaper { color: #2d7081; border-color: #cee5ea; background: var(--bud-color-cyan-soft); }
-.quick-action--weight { color: #476779; border-color: #d3e0e5; background: #eef4f6; }
-.quick-action--event { color: #72556f; border-color: #e4d4e1; background: #f5eff5; }
+.quick-action--direct { color: #c93669; border-color: #ffd2e0; background: var(--baby-primary-soft); }
+.quick-action--bottle { color: #2b70dc; border-color: #d6e6ff; background: var(--baby-blue-soft); }
+.quick-action--storage { color: #168997; border-color: #c7f1f5; background: var(--baby-cyan-soft); }
+.quick-action--diaper { color: #b57c00; border-color: #ffe2a0; background: var(--baby-yellow-soft); }
+.quick-action--weight { color: #6950ce; border-color: #ddd4ff; background: var(--baby-purple-soft); }
+.quick-action--event { color: #268c50; border-color: #cef2db; background: var(--baby-green-soft); }
 
 .summary-strip {
   display: grid;

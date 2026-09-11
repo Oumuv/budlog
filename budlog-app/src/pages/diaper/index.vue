@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { Save, Trash2 } from "lucide-vue-next";
+import { NButton, NInput } from "naive-ui";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { api } from "../../api";
 import DateTimeField from "../../components/DateTimeField.vue";
+import AppLoading from "../../components/AppLoading.vue";
+import AppPage from "../../components/AppPage.vue";
 import PageHeader from "../../components/PageHeader.vue";
+import SegmentedControl from "../../components/SegmentedControl.vue";
 import type { DiaperType } from "../../types";
 import { nowLocalInput, toIso, toLocalInput, uuid } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
@@ -119,18 +123,14 @@ function remove() {
 </script>
 
 <template>
-  <view class="page-shell page-shell--form diaper-page">
+  <AppPage>
+    <view class="page-shell page-shell--form diaper-page">
     <PageHeader :title="recordId ? '编辑尿便记录' : `记录${recordTypeLabel}`" back />
-    <view v-if="loading" class="state-panel surface">
-      <wd-loading color="#b94b5d" />
-      <text class="state-panel__copy">正在加载尿便记录</text>
-    </view>
+    <AppLoading v-if="loading" copy="正在加载尿便记录" />
     <view v-else class="diaper-form surface">
       <view class="field">
         <text class="field__label">类型</text>
-        <wd-segmented v-model:value="form.recordType" :options="recordTypeOptions" size="large" custom-class="diaper-segmented">
-          <template #label="{ option }">{{ option.label }}</template>
-        </wd-segmented>
+        <SegmentedControl v-model="form.recordType" :options="recordTypeOptions" />
       </view>
       <view class="field">
         <text class="field__label">发生时间</text>
@@ -138,14 +138,15 @@ function remove() {
       </view>
       <view class="field">
         <text class="field__label">备注</text>
-        <wd-textarea v-model="form.note" custom-class="wot-control" no-border :maxlength="500" placeholder="可选" />
+        <NInput v-model:value="form.note" type="textarea" :maxlength="500" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="可选" />
       </view>
-      <view class="wot-action-row">
-        <wd-button v-if="recordId" :round="false" type="error" size="large" plain block @click="remove"><Trash2 :size="18" />删除</wd-button>
-        <wd-button :round="false" type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : recordId ? "保存修改" : `记录${recordTypeLabel}` }}</wd-button>
+      <view class="form-actions">
+        <NButton v-if="recordId" type="error" size="large" secondary block @click="remove"><Trash2 :size="18" />删除</NButton>
+        <NButton type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : recordId ? "保存修改" : `记录${recordTypeLabel}` }}</NButton>
       </view>
     </view>
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>
@@ -153,11 +154,4 @@ function remove() {
   padding: 16px;
 }
 
-.diaper-segmented {
-  --wot-segmented-item-bg-color: #f6eeee;
-  --wot-segmented-item-color: var(--bud-color-muted);
-  --wot-segmented-item-acitve-bg: #ffffff;
-  width: 100%;
-  border: 1px solid var(--bud-color-line);
-}
 </style>
