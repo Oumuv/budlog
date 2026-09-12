@@ -13,22 +13,33 @@ import {
   Timer,
 } from "lucide-vue-next";
 import { NButton } from "naive-ui";
-import { onShow } from "@dcloudio/uni-app";
-import { computed, ref } from "vue";
+import { onHide, onShow } from "@dcloudio/uni-app";
+import { computed, onUnmounted, ref } from "vue";
 import { api } from "../../api";
 import AppLoading from "../../components/AppLoading.vue";
 import AppNav from "../../components/AppNav.vue";
 import AppPage from "../../components/AppPage.vue";
 import ErrorState from "../../components/ErrorState.vue";
 import type { Dashboard } from "../../types";
-import { formatDate, setAppTimezone, toLocalInput } from "../../utils/date";
+import { formatDate, formatDuration, setAppTimezone, toLocalInput } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
 
 const dashboard = ref<Dashboard>();
 const loading = ref(true);
 const error = ref("");
+const now = ref(Date.now());
+let clock: ReturnType<typeof setInterval> | undefined;
 
 const calendarAgeDays = computed(() => Math.max(1, dashboard.value?.baby?.ageDayNumber ?? 1));
+const feedingMinutes = computed(() => elapsedMinutes(dashboard.value?.lastFeeding?.startTime));
+const peeMinutes = computed(() => elapsedMinutes(dashboard.value?.lastPee?.recordTime));
+const poopMinutes = computed(() => elapsedMinutes(dashboard.value?.lastPoop?.recordTime));
+const nextFeedingText = computed(() => {
+  const value = dashboard.value?.nextExpectedFeedingTime;
+  if (!value) return "暂无预计时间";
+  const minutes = Math.ceil((new Date(value).getTime() - now.value) / 60_000);
+  return minutes >= 0 ? `还有 ${formatDuration(minutes)}` : `已超时 ${formatDuration(Math.abs(minutes))}`;
+});
 const highlightedMilestones = computed(() =>
   [...(dashboard.value?.milestones ?? [])]
     .filter((item) => item.daysDifference >= 0)
@@ -39,7 +50,13 @@ const highlightedMilestones = computed(() =>
 onShow(async () => {
   if (!(await ensureAccess())) return;
   await load();
+  now.value = Date.now();
+  if (clock) clearInterval(clock);
+  clock = setInterval(() => (now.value = Date.now()), 60_000);
 });
+
+onHide(stopClock);
+onUnmounted(stopClock);
 
 async function load() {
   loading.value = true;
@@ -69,6 +86,16 @@ function milestoneLabel(days: number) {
 
 function birthDate(value: string) {
   return toLocalInput(value).slice(0, 10);
+}
+
+function elapsedMinutes(value?: string) {
+  return value ? Math.max(0, Math.floor((now.value - new Date(value).getTime()) / 60_000)) : undefined;
+}
+
+function stopClock() {
+  if (!clock) return;
+  clearInterval(clock);
+  clock = undefined;
 }
 </script>
 
@@ -139,6 +166,25 @@ function birthDate(value: string) {
               <text class="milestone-card__date">{{ formatDate(item.targetTime) }}</text>
             </view>
           </button>
+        </view>
+
+        <view class="status-grid">
+          <view class="status-card surface">
+            <view class="status-card__top">
+              <view class="status-card__icon status-card__icon--feeding"><Milk :size="20" /></view>
+              <text class="status-card__label">上次喂奶</text>
+            </view>
+            <text class="status-card__value">{{ formatDuration(feedingMinutes) }}</text>
+            <text class="status-card__meta">{{ nextFeedingText }}</text>
+          </view>
+          <view class="status-card surface">
+            <view class="status-card__top">
+              <view class="status-card__icon status-card__icon--diaper"><Droplets :size="20" /></view>
+              <text class="status-card__label">最近尿便</text>
+            </view>
+            <text class="status-card__value">尿 {{ formatDuration(peeMinutes) }}</text>
+            <text class="status-card__meta">便 {{ formatDuration(poopMinutes) }}</text>
+          </view>
         </view>
 
         <view class="quick-grid">
@@ -228,6 +274,16 @@ function birthDate(value: string) {
 .quick-action--cyan { color: #168a9c; background: #eaf9fb; }
 .quick-action--rose { color: #ee3b76; background: #fff0f5; }
 .quick-action--mint { color: #20a975; background: #eafff5; }
+.status-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.status-card { min-width: 0; min-height: 124px; padding: 13px; }
+.status-card__top { display: flex; align-items: center; gap: 9px; }
+.status-card__icon { display: flex; width: 36px; height: 36px; flex: 0 0 auto; align-items: center; justify-content: center; border-radius: 8px; }
+.status-card__icon--feeding { color: #d55a61; background: #ffe9e7; }
+.status-card__icon--diaper { color: #317f91; background: #e2f3f7; }
+.status-card__label, .status-card__value, .status-card__meta { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status-card__label { color: var(--bud-color-muted); font-size: 12px; font-weight: 750; }
+.status-card__value { margin-top: 13px; font-size: 16px; line-height: 22px; font-weight: 800; }
+.status-card__meta { margin-top: 3px; color: var(--bud-color-muted); font-size: 11px; line-height: 18px; }
 .today-section { margin-top: 17px; }
 .section-link { display: inline-flex; align-items: center; gap: 1px; margin: 0; padding: 4px 0; color: var(--bud-color-muted); background: transparent; font-size: 11px; line-height: 18px; }
 .summary-card { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 12px 5px; }
@@ -251,5 +307,8 @@ function birthDate(value: string) {
   .baby-card__art { right: -16px; }
   .baby-card__wish { white-space: normal; }
   .quick-grid { gap: 6px; }
+  .status-grid { gap: 7px; }
+  .status-card { padding: 11px; }
+  .status-card__value { font-size: 14px; }
 }
 </style>
