@@ -36,8 +36,12 @@ button::after {
 }
 
 .page-shell {
+  width: 100%;
+  max-width: 430px;
   min-height: 100vh;
-  padding: 20px 16px calc(96px + env(safe-area-inset-bottom));
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: max(18px, env(safe-area-inset-top)) 15px calc(82px + env(safe-area-inset-bottom));
 }
 
 .page-shell--form {
@@ -46,21 +50,21 @@ button::after {
 
 .page-title {
   margin: 0;
-  font-size: 25px;
-  line-height: 34px;
-  font-weight: 760;
+  font-size: 24px;
+  line-height: 31px;
+  font-weight: 800;
 }
 
 .page-subtitle {
   display: block;
   margin-top: 2px;
   color: var(--bud-color-muted);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .section {
-  margin-top: 26px;
+  margin-top: 20px;
 }
 
 .section-title {
@@ -68,7 +72,7 @@ button::after {
   align-items: center;
   justify-content: space-between;
   min-height: 30px;
-  margin-bottom: 11px;
+  margin-bottom: 9px;
 }
 
 .section-title__text {
@@ -129,12 +133,12 @@ button::after {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 8px;
   color: var(--bud-color-body);
   background: transparent;
   transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
@@ -296,7 +300,7 @@ textarea.field__control {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--bud-color-line);
-  border-radius: 17px;
+  border-radius: 8px;
   color: var(--bud-color-body);
   background: var(--bud-color-surface);
   font-size: 13px;
@@ -323,12 +327,10 @@ textarea.field__control {
   line-height: 18px;
 }
 
-@media (min-width: 760px) {
+@media (min-width: 480px) {
   .page-shell {
-    width: 740px;
-    margin: 0 auto;
-    padding-right: 26px;
-    padding-left: 26px;
+    padding-right: 20px;
+    padding-left: 20px;
   }
 }
 </style>

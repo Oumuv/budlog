@@ -27,8 +27,10 @@ export function monthGrid(month: string): string[] {
   const first = `${month}-01`;
   const [year, monthNumber] = month.split("-").map(Number);
   const weekday = new Date(Date.UTC(year, monthNumber - 1, 1)).getUTCDay();
-  const start = shiftDay(first, -((weekday + 6) % 7));
-  return Array.from({ length: 42 }, (_, index) => shiftDay(start, index));
+  const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  const start = shiftDay(first, -weekday);
+  const cellCount = weekday + daysInMonth <= 35 ? 35 : 42;
+  return Array.from({ length: cellCount }, (_, index) => shiftDay(start, index));
 }
 
 export function shiftMonth(month: string, amount: number): string {

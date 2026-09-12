@@ -39,39 +39,41 @@ function go(key: string) {
 .app-nav {
   position: fixed;
   z-index: 10;
-  right: 0;
+  right: auto;
   bottom: 0;
-  left: 0;
-  padding: 7px max(8px, calc((100vw - 740px) / 2)) calc(7px + env(safe-area-inset-bottom));
+  left: 50%;
+  width: min(100%, 430px);
+  padding: 5px 9px calc(5px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--bud-color-line);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 -6px 22px rgba(45, 55, 72, 0.08);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 -5px 18px rgba(49, 70, 109, 0.06);
   backdrop-filter: blur(14px);
+  transform: translateX(-50%);
 }
 
 .app-nav__inner {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  max-width: 720px;
+  max-width: 412px;
   margin: 0 auto;
 }
 
 .app-nav__item {
   display: flex;
   min-width: 0;
-  min-height: 48px;
+  min-height: 47px;
   margin: 0;
   padding: 4px 2px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 1px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--bud-color-muted);
   background: transparent;
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 10px;
+  line-height: 15px;
 }
 
 .app-nav__item--active {
