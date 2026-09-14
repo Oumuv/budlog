@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { Play, Save, Square, Timer, Trash2, X } from "lucide-vue-next";
+import { NButton, NInput, NInputNumber, NSwitch } from "naive-ui";
 import { onBackPress, onHide, onLoad, onShow, onUnload } from "@dcloudio/uni-app";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { api } from "../../api";
+import AppLoading from "../../components/AppLoading.vue";
+import AppPage from "../../components/AppPage.vue";
 import DateTimeField from "../../components/DateTimeField.vue";
 import PageHeader from "../../components/PageHeader.vue";
+import SegmentedControl from "../../components/SegmentedControl.vue";
 import { useTimerStore } from "../../stores/timer";
 import type { BreastSide, FeedingType } from "../../types";
 import { nowLocalInput, toIso, toLocalInput, uuid } from "../../utils/date";
@@ -56,6 +60,10 @@ const amountPresets = computed(() => {
     options.unshift({ value: lastBottleAmount.value, label: `上次 ${lastBottleAmount.value}` });
   }
   return options;
+});
+const amountValue = computed<number | null>({
+  get: () => form.amountMl === "" ? null : Number(form.amountMl),
+  set: (value) => { form.amountMl = value === null ? "" : String(value); },
 });
 
 watch(form, () => {
@@ -249,13 +257,11 @@ function setAmount(amount: number) {
 </script>
 
 <template>
-  <view class="page-shell page-shell--form feeding-page">
+  <AppPage>
+    <view class="page-shell page-shell--form feeding-page">
     <PageHeader :title="recordId ? '编辑喂奶记录' : isTimerPage ? '亲喂计时' : '记录喂奶'" back />
 
-    <view v-if="loading" class="state-panel surface">
-      <wd-loading color="#b94b5d" />
-      <text class="state-panel__copy">正在加载喂奶记录</text>
-    </view>
+    <AppLoading v-if="loading" copy="正在加载喂奶记录" />
 
     <template v-else-if="isTimerPage">
       <view v-if="timerStore.draft" class="timer-panel surface">
@@ -265,37 +271,31 @@ function setAmount(amount: number) {
         <text class="timer-panel__started">开始于 {{ toLocalInput(timerStore.draft.startTime).slice(11) }}</text>
         <view class="field timer-note">
           <text class="field__label">备注</text>
-          <wd-textarea v-model="form.note" custom-class="wot-control" no-border :maxlength="500" placeholder="可选" />
+          <NInput v-model:value="form.note" type="textarea" :maxlength="500" :autosize="{ minRows: 2, maxRows: 5 }" placeholder="可选" />
         </view>
         <view class="timer-actions">
-          <wd-button :round="false" type="error" size="large" plain block @click="cancelTimer"><X :size="18" />取消</wd-button>
-          <wd-button :round="false" type="primary" size="large" block :loading="saving" @click="stopAndSave"><Square :size="18" />{{ saving ? "保存中" : "停止并保存" }}</wd-button>
+          <NButton type="error" size="large" secondary block @click="cancelTimer"><X :size="18" />取消</NButton>
+          <NButton type="primary" size="large" block :loading="saving" @click="stopAndSave"><Square :size="18" />{{ saving ? "保存中" : "停止并保存" }}</NButton>
         </view>
       </view>
       <view v-else class="timer-panel surface">
         <view class="timer-panel__icon"><Timer :size="24" /></view>
         <text class="timer-panel__prompt">选择亲喂侧别</text>
         <text class="timer-panel__copy">计时会在离开页面后继续保留</text>
-        <wd-segmented v-model:value="form.breastSide" :options="sideOptions" size="large" custom-class="form-segmented timer-side">
-          <template #label="{ option }">{{ option.label }}</template>
-        </wd-segmented>
-        <wd-button :round="false" type="primary" size="large" block :disabled="!form.breastSide" @click="startTimer"><Play :size="19" />开始计时</wd-button>
+        <SegmentedControl v-model="form.breastSide" class="timer-side" :options="sideOptions" />
+        <NButton type="primary" size="large" block :disabled="!form.breastSide" @click="startTimer"><Play :size="19" />开始计时</NButton>
       </view>
     </template>
 
     <view v-else-if="!loading" class="feeding-form surface">
       <view class="field">
         <text class="field__label">喂奶类型</text>
-        <wd-segmented v-model:value="form.feedingType" :options="feedingTypeOptions" size="large" custom-class="form-segmented type-segmented">
-          <template #label="{ option }">{{ option.label }}</template>
-        </wd-segmented>
+        <SegmentedControl v-model="form.feedingType" :options="feedingTypeOptions" />
       </view>
 
       <view v-if="form.feedingType !== 'FORMULA_BOTTLE'" class="field">
         <text class="field__label">侧别{{ isDirect ? '' : '（可选）' }}</text>
-        <wd-segmented v-model:value="form.breastSide" :options="isDirect ? sideOptions : optionalSideOptions" size="large" custom-class="form-segmented">
-          <template #label="{ option }">{{ option.label }}</template>
-        </wd-segmented>
+        <SegmentedControl v-model="form.breastSide" :options="isDirect ? sideOptions : optionalSideOptions" />
       </view>
 
       <view class="field">
@@ -309,7 +309,7 @@ function setAmount(amount: number) {
             <text class="toggle-end__title">填写结束时间</text>
             <text class="toggle-end__copy">关闭后仅保存开始时间</text>
           </view>
-          <wd-switch v-model="form.hasEnd" />
+          <NSwitch v-model:value="form.hasEnd" />
         </view>
         <view v-if="form.hasEnd" class="field">
           <text class="field__label">结束时间</text>
@@ -320,15 +320,13 @@ function setAmount(amount: number) {
       <view v-if="isBottle" class="field">
         <text class="field__label">奶量（ml）</text>
         <view class="amount-stepper">
-          <wd-input-number
-            v-model="form.amountMl"
+          <NInputNumber
+            v-model:value="amountValue"
             :min="1"
             :max="1000"
             :step="10"
             :precision="0"
-            allow-null
-            long-press
-            input-type="digit"
+            button-placement="both"
             placeholder="0"
           />
           <text class="amount-stepper__unit">ml</text>
@@ -349,29 +347,22 @@ function setAmount(amount: number) {
 
       <view class="field">
         <text class="field__label">备注</text>
-        <wd-textarea v-model="form.note" custom-class="wot-control" no-border :maxlength="500" placeholder="可选" />
+        <NInput v-model:value="form.note" type="textarea" :maxlength="500" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="可选" />
       </view>
 
-      <view class="wot-action-row feeding-actions">
-        <wd-button v-if="recordId" :round="false" type="error" size="large" plain block :loading="deleting" @click="remove"><Trash2 :size="18" />删除</wd-button>
-        <wd-button :round="false" type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : "保存" }}</wd-button>
+      <view class="form-actions feeding-actions">
+        <NButton v-if="recordId" type="error" size="large" secondary block :loading="deleting" @click="remove"><Trash2 :size="18" />删除</NButton>
+        <NButton type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : "保存" }}</NButton>
       </view>
     </view>
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>
 .feeding-form,
 .timer-panel {
   padding: 16px;
-}
-
-.form-segmented {
-  --wot-segmented-item-bg-color: #f6eeee;
-  --wot-segmented-item-color: var(--bud-color-muted);
-  --wot-segmented-item-acitve-bg: #ffffff;
-  width: 100%;
-  border: 1px solid var(--bud-color-line);
 }
 
 .toggle-end {
@@ -423,7 +414,7 @@ function setAmount(amount: number) {
   gap: 10px;
   border: 1px solid var(--bud-color-line);
   border-radius: 10px;
-  background: #fffdfd;
+  background: var(--bud-color-surface);
 }
 
 .amount-stepper__unit {
@@ -461,7 +452,7 @@ function setAmount(amount: number) {
 .timer-panel__icon--active {
   color: #ffffff;
   background: var(--bud-color-primary);
-  box-shadow: 0 8px 18px rgba(185, 75, 93, 0.2);
+  box-shadow: 0 8px 18px rgba(255, 93, 143, 0.22);
 }
 
 .timer-panel__label {

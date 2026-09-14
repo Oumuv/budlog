@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { Save, Trash2 } from "lucide-vue-next";
+import { NButton, NInput, NInputNumber } from "naive-ui";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { api } from "../../api";
 import DateTimeField from "../../components/DateTimeField.vue";
+import AppLoading from "../../components/AppLoading.vue";
+import AppPage from "../../components/AppPage.vue";
 import PageHeader from "../../components/PageHeader.vue";
 import { nowLocalInput, toIso, toLocalInput, uuid } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
@@ -31,6 +34,10 @@ const amountPresets = computed(() => {
     options.unshift({ value: lastAmount.value, label: `上次 ${lastAmount.value}` });
   }
   return options;
+});
+const amountValue = computed<number | null>({
+  get: () => form.amountMl === "" ? null : Number(form.amountMl),
+  set: (value) => { form.amountMl = value === null ? "" : String(value); },
 });
 
 watch(form, () => {
@@ -152,13 +159,11 @@ function setAmount(amount: number) {
 </script>
 
 <template>
-  <view class="page-shell page-shell--form milk-storage-page">
+  <AppPage>
+    <view class="page-shell page-shell--form milk-storage-page">
     <PageHeader :title="recordId ? '编辑存奶记录' : '记录存奶'" back />
 
-    <view v-if="loading" class="state-panel surface">
-      <wd-loading color="#b94b5d" />
-      <text class="state-panel__copy">正在加载存奶记录</text>
-    </view>
+    <AppLoading v-if="loading" copy="正在加载存奶记录" />
 
     <view v-else class="milk-storage-form surface">
       <view class="field">
@@ -169,15 +174,13 @@ function setAmount(amount: number) {
       <view class="field">
         <text class="field__label">存奶量（ml）</text>
         <view class="amount-stepper">
-          <wd-input-number
-            v-model="form.amountMl"
+          <NInputNumber
+            v-model:value="amountValue"
             :min="0.1"
             :max="1000"
             :step="10"
             :precision="1"
-            allow-null
-            long-press
-            input-type="digit"
+            button-placement="both"
             placeholder="0"
           />
           <text class="amount-stepper__unit">ml</text>
@@ -198,15 +201,16 @@ function setAmount(amount: number) {
 
       <view class="field">
         <text class="field__label">备注</text>
-        <wd-textarea v-model="form.note" custom-class="wot-control" no-border :maxlength="500" placeholder="可选" />
+        <NInput v-model:value="form.note" type="textarea" :maxlength="500" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="可选" />
       </view>
 
-      <view class="wot-action-row">
-        <wd-button v-if="recordId" :round="false" type="error" size="large" plain block :loading="deleting" @click="remove"><Trash2 :size="18" />删除</wd-button>
-        <wd-button :round="false" type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : recordId ? "保存修改" : "记录存奶" }}</wd-button>
+      <view class="form-actions">
+        <NButton v-if="recordId" type="error" size="large" secondary block :loading="deleting" @click="remove"><Trash2 :size="18" />删除</NButton>
+        <NButton type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : recordId ? "保存修改" : "记录存奶" }}</NButton>
       </view>
     </view>
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>

@@ -1,10 +1,4 @@
 {
-  "easycom": {
-    "autoscan": true,
-    "custom": {
-      "^wd-(.*)": "wot-design-uni/components/wd-$1/wd-$1.vue"
-    }
-  },
   "pages": [
     { "path": "pages/access/index", "style": { "navigationStyle": "custom" } },
     { "path": "pages/home/index", "style": { "navigationStyle": "custom" } },
@@ -24,7 +18,7 @@
   "globalStyle": {
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "Budlog",
-    "navigationBarBackgroundColor": "#FFF8F7",
-    "backgroundColor": "#FFF8F7"
+    "navigationBarBackgroundColor": "#F7F9FC",
+    "backgroundColor": "#F7F9FC"
   }
 }

@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { Save, Trash2 } from "lucide-vue-next";
+import { NButton, NInput, NSwitch } from "naive-ui";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
 import { nextTick, reactive, ref, watch } from "vue";
 import { api } from "../../api";
+import AppLoading from "../../components/AppLoading.vue";
+import AppPage from "../../components/AppPage.vue";
 import DateTimeField from "../../components/DateTimeField.vue";
 import PageHeader from "../../components/PageHeader.vue";
+import SegmentedControl from "../../components/SegmentedControl.vue";
 import { shiftDay, toIso, toLocalInput, todayKey, uuid } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
 import { clearShownReminder } from "../../utils/reminders";
@@ -187,20 +191,18 @@ watch(() => form.hasReminder, (enabled) => {
 </script>
 
 <template>
-  <view class="page-shell page-shell--form task-edit-page">
+  <AppPage>
+    <view class="page-shell page-shell--form task-edit-page">
     <PageHeader :title="taskId ? '编辑任务' : '新增任务'" back />
-    <view v-if="loading" class="state-panel surface">
-      <wd-loading color="#b94b5d" />
-      <text class="state-panel__copy">正在加载任务</text>
-    </view>
+    <AppLoading v-if="loading" copy="正在加载任务" />
     <view v-else class="task-form surface">
       <view class="field">
         <text class="field__label">标题</text>
-        <wd-input v-model="form.title" custom-class="wot-control" no-border clearable :maxlength="100" placeholder="任务标题" />
+        <NInput v-model:value="form.title" clearable :maxlength="100" placeholder="任务标题" />
       </view>
       <view class="field">
         <text class="field__label">说明</text>
-        <wd-textarea v-model="form.description" custom-class="wot-control" no-border :maxlength="1000" placeholder="可选" />
+        <NInput v-model:value="form.description" type="textarea" :maxlength="1000" :autosize="{ minRows: 3, maxRows: 7 }" placeholder="可选" />
       </view>
       <view class="field">
         <text class="field__label">到期时间</text>
@@ -222,21 +224,20 @@ watch(() => form.hasReminder, (enabled) => {
           <text class="reminder-toggle__title">到期提醒</text>
           <text class="reminder-toggle__copy">在到期前提醒家庭成员</text>
         </view>
-        <wd-switch v-model="form.hasReminder" />
+        <NSwitch v-model:value="form.hasReminder" />
       </view>
       <view v-if="form.hasReminder" class="field">
         <text class="field__label">提前提醒</text>
-        <wd-segmented v-model:value="reminderLead" :options="reminderOptions" size="large" custom-class="reminder-segmented">
-          <template #label="{ option }">{{ option.label }}</template>
-        </wd-segmented>
+        <SegmentedControl v-model="reminderLead" class="reminder-segmented" :options="reminderOptions" />
         <DateTimeField v-if="reminderLead === 'CUSTOM'" v-model="form.remindTime" title="选择提醒时间" />
       </view>
-      <view class="wot-action-row">
-        <wd-button v-if="taskId" :round="false" type="error" size="large" plain block @click="remove"><Trash2 :size="18" />删除</wd-button>
-        <wd-button :round="false" type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : "保存" }}</wd-button>
+      <view class="form-actions">
+        <NButton v-if="taskId" type="error" size="large" secondary block @click="remove"><Trash2 :size="18" />删除</NButton>
+        <NButton type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : "保存" }}</NButton>
       </view>
     </view>
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>
@@ -283,12 +284,7 @@ watch(() => form.hasReminder, (enabled) => {
 }
 
 .reminder-segmented {
-  --wot-segmented-item-bg-color: #f6eeee;
-  --wot-segmented-item-color: var(--bud-color-muted);
-  --wot-segmented-item-acitve-bg: #ffffff;
-  width: 100%;
   margin-bottom: 10px;
-  border: 1px solid var(--bud-color-line);
 }
 
 @media (max-width: 380px) {

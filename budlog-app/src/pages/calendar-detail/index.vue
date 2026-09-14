@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { FileText, Pencil } from "lucide-vue-next";
+import { NButton } from "naive-ui";
 import { onLoad, onShow, onUnload } from "@dcloudio/uni-app";
 import { ref } from "vue";
 import { api } from "../../api";
+import AppLoading from "../../components/AppLoading.vue";
+import AppPage from "../../components/AppPage.vue";
+import ErrorState from "../../components/ErrorState.vue";
 import PageHeader from "../../components/PageHeader.vue";
 import type { CalendarCategory } from "../../types";
 import { categoryLabels, eventLabels, taskLabels } from "../../utils/calendar";
@@ -151,17 +155,11 @@ function edit() {
 </script>
 
 <template>
-  <view class="page-shell page-shell--form detail-page">
+  <AppPage>
+    <view class="page-shell page-shell--form detail-page">
     <PageHeader title="事项详情" back />
-    <view v-if="loading" class="state-panel surface">
-      <wd-loading color="#b94b5d" />
-      <text class="state-panel__copy">正在加载事项详情</text>
-    </view>
-    <view v-else-if="error" class="state-panel surface">
-      <text class="state-panel__title">暂时无法查看</text>
-      <text class="state-panel__copy">{{ error }}</text>
-      <wd-button type="info" @click="load">重试</wd-button>
-    </view>
+    <AppLoading v-if="loading" copy="正在加载事项详情" />
+    <ErrorState v-else-if="error" title="暂时无法查看" :copy="error" @retry="load" />
     <template v-else-if="detail">
       <view class="detail-card surface">
         <text class="detail-kind">{{ detail.kind }}</text>
@@ -176,9 +174,10 @@ function edit() {
         <view class="detail-notes-heading"><FileText :size="17" /><text>{{ category === 'TASK' ? '任务说明' : '备注' }}</text></view>
         <text class="detail-note" :class="{ muted: !detail.note }">{{ detail.note || '暂无补充说明' }}</text>
       </view>
-      <wd-button v-if="detail.editUrl" :round="false" size="large" block @click="edit"><Pencil :size="17" />编辑此事项</wd-button>
+      <NButton v-if="detail.editUrl" size="large" block @click="edit"><Pencil :size="17" />编辑此事项</NButton>
     </template>
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>

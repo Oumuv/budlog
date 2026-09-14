@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { LockKeyhole, ShieldCheck } from "lucide-vue-next";
+import { NButton, NInput, NSwitch } from "naive-ui";
 import { onLoad } from "@dcloudio/uni-app";
 import { ref } from "vue";
 import { verifyPassword } from "../../api/request";
 import BrandMark from "../../components/BrandMark.vue";
+import AppPage from "../../components/AppPage.vue";
 import { getPassword, setPassword } from "../../utils/auth";
 import { resetAccessVerification } from "../../utils/guard";
 
@@ -46,7 +48,8 @@ async function submit() {
 </script>
 
 <template>
-  <view class="access-page">
+  <AppPage>
+    <view class="access-page">
     <view class="access-card">
       <view class="access-brand">
         <BrandMark size="large" />
@@ -66,28 +69,26 @@ async function submit() {
 
       <view class="access-form">
         <text class="field__label">家庭访问密码</text>
-        <wd-input
-          v-model="password"
-          custom-class="wot-control access-password"
-          no-border
+        <NInput
+          v-model:value="password"
+          class="access-password"
           clearable
-          show-password
+          type="password"
+          show-password-on="click"
           placeholder="请输入密码"
-          confirm-type="done"
-          @confirm="submit"
+          @keyup.enter="submit"
         >
           <template #prefix><LockKeyhole :size="19" /></template>
-        </wd-input>
+        </NInput>
         <view class="remember-row">
           <view>
             <text class="remember-row__title">记住密码</text>
             <text class="remember-row__copy">仅保存在当前设备</text>
           </view>
-          <wd-switch v-model="remember" />
+          <NSwitch v-model:value="remember" />
         </view>
         <text v-if="error" class="access-error">{{ error }}</text>
-        <wd-button
-          :round="false"
+        <NButton
           type="primary"
           size="large"
           block
@@ -96,10 +97,11 @@ async function submit() {
           @click="submit"
         >
           {{ loading ? "验证中" : "进入 Budlog" }}
-        </wd-button>
+        </NButton>
       </view>
     </view>
-  </view>
+    </view>
+  </AppPage>
 </template>
 
 <style scoped>
@@ -180,8 +182,8 @@ async function submit() {
   font-size: 12px;
 }
 
-:deep(.access-password) {
-  --wot-input-icon-color: var(--bud-color-primary);
+:deep(.access-password .n-input__prefix) {
+  color: var(--bud-color-primary);
 }
 
 .remember-row {

@@ -1,0 +1,28 @@
+@keyframes bud-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.surface,
+.state-panel {
+  animation: bud-enter 180ms ease-out both;
+}
+
+button,
+.n-button,
+.n-radio-button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface,
+  .state-panel {
+    animation: none;
+  }
+}
