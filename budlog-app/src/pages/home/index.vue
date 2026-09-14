@@ -205,9 +205,9 @@ function stopClock() {
           </view>
           <view class="summary-card surface">
             <view class="summary-card__metric summary-card__metric--pink"><Milk :size="18" /><text class="summary-card__value">{{ dashboard.todaySummary.feedingCount }}</text><text class="summary-card__label">喂奶</text></view>
-            <view class="summary-card__metric summary-card__metric--blue"><Droplets :size="18" /><text class="summary-card__value">{{ dashboard.todaySummary.bottleAmountMl }}</text><text class="summary-card__label">毫升</text></view>
+            <view class="summary-card__metric summary-card__metric--blue"><Milk :size="18" /><text class="summary-card__value">{{ dashboard.todaySummary.bottleAmountMl }}</text><text class="summary-card__label">毫升</text></view>
             <view class="summary-card__metric summary-card__metric--slate"><Timer :size="18" /><text class="summary-card__value">{{ dashboard.todaySummary.directFeedingMinutes }}</text><text class="summary-card__label">亲喂(分钟)</text></view>
-            <view class="summary-card__metric summary-card__metric--yellow"><Baby :size="18" /><text class="summary-card__value">{{ dashboard.todaySummary.peeCount }}/{{ dashboard.todaySummary.poopCount }}</text><text class="summary-card__label">尿/便</text></view>
+            <view class="summary-card__metric summary-card__metric--yellow"><Droplets :size="18" /><text class="summary-card__value">{{ dashboard.todaySummary.peeCount }}/{{ dashboard.todaySummary.poopCount }}</text><text class="summary-card__label">尿/便</text></view>
           </view>
           <view class="summary-detail-grid">
             <button class="summary-detail surface" @click="go('/pages/milk-storage/index')">
