@@ -28,7 +28,7 @@ let clock: ReturnType<typeof setInterval> | undefined;
 const form = reactive({
   clientRequestId: uuid(),
   feedingType: "BREAST_DIRECT" as FeedingType,
-  breastSide: "LEFT" as BreastSide | "",
+  breastSide: "BOTH" as BreastSide | "",
   startTime: nowLocalInput(),
   endTime: nowLocalInput(),
   hasEnd: true,
@@ -75,12 +75,15 @@ onLoad(async (options) => {
   const storedAmount = Number(uni.getStorageSync(LAST_BOTTLE_AMOUNT_KEY));
   if (Number.isFinite(storedAmount) && storedAmount > 0 && storedAmount <= 1000) lastBottleAmount.value = storedAmount;
   mode.value = String(options?.mode || "");
-  if (mode.value === "bottle") form.feedingType = "BREAST_BOTTLE";
+  if (mode.value === "bottle") {
+    form.feedingType = "BREAST_BOTTLE";
+    form.breastSide = "";
+  }
   const id = Number(options?.id || 0);
   if (id) {
     recordId.value = id;
     await loadRecord(id);
-  } else if (timerStore.draft) {
+  } else if (mode.value !== "bottle" && timerStore.draft) {
     form.breastSide = timerStore.draft.breastSide;
   }
   await nextTick();
@@ -124,7 +127,7 @@ async function loadRecord(id: number) {
     const record = await api.feeding(id);
     form.clientRequestId = record.clientRequestId;
     form.feedingType = record.feedingType;
-    form.breastSide = record.breastSide || (record.feedingType === "BREAST_DIRECT" ? "LEFT" : "");
+    form.breastSide = record.breastSide || "";
     form.startTime = toLocalInput(record.startTime);
     form.endTime = toLocalInput(record.endTime || record.startTime);
     form.hasEnd = Boolean(record.endTime);
@@ -134,6 +137,18 @@ async function loadRecord(id: number) {
     uni.showToast({ title: exception instanceof Error ? exception.message : "加载失败", icon: "none" });
   } finally {
     loading.value = false;
+  }
+}
+
+function updateFeedingType(value: string | number) {
+  const nextType = value as FeedingType;
+  const previousType = form.feedingType;
+  form.feedingType = nextType;
+
+  if (nextType === "FORMULA_BOTTLE" || (nextType === "BREAST_BOTTLE" && previousType === "BREAST_DIRECT")) {
+    form.breastSide = "";
+  } else if (nextType === "BREAST_DIRECT" && !form.breastSide) {
+    form.breastSide = "BOTH";
   }
 }
 
@@ -290,7 +305,7 @@ function setAmount(amount: number) {
     <view v-else-if="!loading" class="feeding-form surface">
       <view class="field">
         <text class="field__label">喂奶类型</text>
-        <SegmentedControl v-model="form.feedingType" :options="feedingTypeOptions" />
+        <SegmentedControl :model-value="form.feedingType" :options="feedingTypeOptions" @update:model-value="updateFeedingType" />
       </view>
 
       <view v-if="form.feedingType !== 'FORMULA_BOTTLE'" class="field">
