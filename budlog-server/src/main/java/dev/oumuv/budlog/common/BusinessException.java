@@ -32,4 +32,8 @@ public class BusinessException extends RuntimeException {
     public static BusinessException conflict(String message) {
         return new BusinessException(40900, HttpStatus.CONFLICT, message);
     }
+
+    public static BusinessException serviceUnavailable(String message) {
+        return new BusinessException(50300, HttpStatus.SERVICE_UNAVAILABLE, message);
+    }
 }

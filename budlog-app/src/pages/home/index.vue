@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  AudioLines,
   Baby,
   BellRing,
   CalendarDays,
@@ -198,6 +199,15 @@ function stopClock() {
           <button class="quick-action quick-action--mint" @click="go('/pages/calendar/index')"><CalendarDays :size="23" /><text>日历</text></button>
         </view>
 
+        <button class="white-noise-entry surface" @click="go('/pages/white-noise/index')">
+          <image src="/static/ui/baby-sleep.png" mode="aspectFill" />
+          <view class="white-noise-entry__body">
+            <view class="white-noise-entry__title"><AudioLines :size="18" /><text>白噪音</text></view>
+            <text class="white-noise-entry__copy">给日常添一点安静</text>
+          </view>
+          <ChevronRight :size="18" />
+        </button>
+
         <view class="section today-section">
           <view class="section-title">
             <text class="section-title__text">今日摘要</text>
@@ -274,6 +284,13 @@ function stopClock() {
 .quick-action--cyan { color: #168a9c; background: #eaf9fb; border-color: #d1ecf0; }
 .quick-action--rose { color: #ee3b76; background: #fff0f5; border-color: #fddae6; }
 .quick-action--mint { color: #20a975; background: #eafff5; border-color: #d2f5e6; }
+.white-noise-entry { display: grid; width: 100%; min-height: 70px; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 11px; margin: 11px 0 0; padding: 8px 12px 8px 8px; text-align: left; }
+.white-noise-entry image { width: 52px; height: 52px; border-radius: 7px; background: var(--bud-color-primary-soft); }
+.white-noise-entry__body { min-width: 0; }
+.white-noise-entry__title { display: flex; align-items: center; gap: 6px; color: var(--bud-color-ink); font-size: 14px; font-weight: 800; }
+.white-noise-entry__title .lucide { color: var(--bud-color-primary); }
+.white-noise-entry__copy { display: block; margin-top: 3px; color: var(--bud-color-muted); font-size: 11px; }
+.white-noise-entry > .lucide { color: var(--bud-color-muted); }
 .status-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
 .status-card { min-width: 0; min-height: 124px; padding: 13px; }
 .status-card__top { display: flex; align-items: center; gap: 9px; }

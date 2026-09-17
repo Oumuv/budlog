@@ -21,6 +21,7 @@ import type {
   TodoTask,
   WeightInput,
   WeightRecord,
+  WhiteNoisePlaylist,
 } from "../types";
 import { toIso } from "../utils/date";
 import { apiRequest } from "./request";
@@ -105,4 +106,6 @@ export const api = {
   settings: () => apiRequest<AppSetting>("/settings"),
   saveSettings: (data: Omit<AppSetting, "feedingIntervalAnchor">) =>
     apiRequest<AppSetting>("/settings", { method: "PUT", data }),
+  whiteNoisePlaylists: () => apiRequest<WhiteNoisePlaylist[]>("/white-noise/playlists"),
+  logoutAccessSession: () => apiRequest<void>("/access/logout", { method: "POST", skipAuthRedirect: true }),
 };

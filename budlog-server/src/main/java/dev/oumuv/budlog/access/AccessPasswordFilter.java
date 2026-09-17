@@ -31,13 +31,15 @@ public class AccessPasswordFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         return HttpMethod.OPTIONS.matches(request.getMethod())
                 || "/api/v1/access/verify".equals(path)
+                || "/api/v1/access/logout".equals(path)
                 || "/actuator/health".equals(path);
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        if (passwordService.matches(request.getHeader(AccessPasswordService.HEADER_NAME))) {
+        if (passwordService.matches(request.getHeader(AccessPasswordService.HEADER_NAME))
+                || isAuthorizedMediaRequest(request)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -46,5 +48,20 @@ public class AccessPasswordFilter extends OncePerRequestFilter {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getWriter(), new ApiResponse<Void>(40100, "家庭访问密码不正确", null));
+    }
+
+    private boolean isAuthorizedMediaRequest(HttpServletRequest request) {
+        if (!request.getRequestURI().startsWith(AccessPasswordService.MEDIA_COOKIE_PATH + "/")) {
+            return false;
+        }
+        if (request.getCookies() == null) {
+            return false;
+        }
+        for (javax.servlet.http.Cookie cookie : request.getCookies()) {
+            if (AccessPasswordService.MEDIA_COOKIE_NAME.equals(cookie.getName())) {
+                return passwordService.matchesMediaSession(cookie.getValue());
+            }
+        }
+        return false;
     }
 }

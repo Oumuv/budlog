@@ -14,6 +14,12 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      - type: bind
+        source: ${WHITE_NOISE_HOST_DIRECTORY:-./white-noise}
+        target: /data/white-noise
+        read_only: true
+        bind:
+          create_host_path: true
     environment:
       SPRING_PROFILES_ACTIVE: dev
       POSTGRESQL_HOST: ${POSTGRESQL_HOST:?POSTGRESQL_HOST is required}
@@ -24,6 +30,7 @@ services:
       APP_ACCESS_ENABLED: "false"
       APP_TIMEZONE: ${BUDLOG_TIMEZONE:-Asia/Shanghai}
       DEFAULT_FEEDING_INTERVAL_MIN: ${BUDLOG_FEEDING_INTERVAL_MIN:-180}
+      WHITE_NOISE_ROOT_DIRECTORY: /Users/oumuv/Desktop/music
       CORS_ALLOWED_ORIGINS: "http://localhost:${BUDLOG_DEV_WEB_PORT:-5174},http://127.0.0.1:${BUDLOG_DEV_WEB_PORT:-5174}"
       JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8
       TZ: ${BUDLOG_TIMEZONE:-Asia/Shanghai}

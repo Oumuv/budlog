@@ -10,13 +10,16 @@ import AppPage from "../../components/AppPage.vue";
 import DateTimeField from "../../components/DateTimeField.vue";
 import ErrorState from "../../components/ErrorState.vue";
 import type { AppSetting, Milestone } from "../../types";
+import { useWhiteNoisePlayerStore } from "../../stores/whiteNoisePlayer";
 import { clearPassword } from "../../utils/auth";
 import { formatDate, nowLocalInput, setAppTimezone, toIso, toLocalInput, uuid } from "../../utils/date";
 import { ensureAccess, resetAccessVerification } from "../../utils/guard";
 import { pwaInstallAvailable, pwaStandalone, requestPwaInstall } from "../../utils/pwa";
 
 const SHANGHAI_TIMEZONE = "Asia/Shanghai";
+const whiteNoisePlayer = useWhiteNoisePlayerStore();
 const loading = ref(false);
+const loggingOut = ref(false);
 const savingProfile = ref(false);
 const savingSettings = ref(false);
 const error = ref("");
@@ -167,10 +170,20 @@ function removeMilestone(item: Milestone) {
   });
 }
 
-function logout() {
-  clearPassword();
-  resetAccessVerification();
-  uni.reLaunch({ url: "/pages/access/index" });
+async function logout() {
+  if (loggingOut.value) return;
+  loggingOut.value = true;
+  try {
+    await api.logoutAccessSession();
+    whiteNoisePlayer.disposePlayback();
+    clearPassword();
+    resetAccessVerification();
+    uni.reLaunch({ url: "/pages/access/index" });
+  } catch (exception) {
+    console.warn("Budlog media session logout failed", exception);
+    uni.showToast({ title: "退出失败，请检查网络后重试", icon: "none" });
+    loggingOut.value = false;
+  }
 }
 
 function milestoneStatus(days: number) {
@@ -306,7 +319,7 @@ async function installPwa() {
               <view v-if="pwaStandalone" class="utility-row__state"><Check :size="14" />已安装</view>
               <Download v-else :size="17" />
             </button>
-            <button class="utility-row utility-row--logout" @click="logout"><view class="utility-row__icon"><LogOut :size="19" /></view><view><text>退出访问</text><small>清除当前设备保存的访问凭据</small></view></button>
+            <button class="utility-row utility-row--logout" :disabled="loggingOut" @click="logout"><view class="utility-row__icon"><LogOut :size="19" /></view><view><text>退出访问</text><small>{{ loggingOut ? "正在清除访问凭据" : "清除当前设备保存的访问凭据" }}</small></view></button>
           </view>
         </view>
       </template>
