@@ -2,6 +2,7 @@
 .env
 deploy/.env
 deploy/backups/
+deploy/white-noise/
 
 # Build and dependency output
 budlog-app/node_modules/

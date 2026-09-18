@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { onHide, onLaunch, onShow } from "@dcloudio/uni-app";
+import { useWhiteNoisePlayerStore } from "./stores/whiteNoisePlayer";
 import { initializePwa } from "./utils/pwa";
 import { startReminderLoop, stopReminderLoop } from "./utils/reminders";
 
-onLaunch(() => initializePwa());
-onShow(() => startReminderLoop());
+const whiteNoisePlayer = useWhiteNoisePlayerStore();
+
+onLaunch(() => {
+  initializePwa();
+  whiteNoisePlayer.initialize();
+});
+onShow(() => {
+  startReminderLoop();
+  whiteNoisePlayer.handleResume();
+});
 onHide(() => stopReminderLoop());
 </script>
 

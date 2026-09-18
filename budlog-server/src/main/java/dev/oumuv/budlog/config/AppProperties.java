@@ -7,6 +7,7 @@ public class AppProperties {
 
     private final Access access = new Access();
     private final Feeding feeding = new Feeding();
+    private final WhiteNoise whiteNoise = new WhiteNoise();
     private String timezone = "Asia/Shanghai";
     private String corsAllowedOrigins = "http://localhost:5173,http://127.0.0.1:5173";
 
@@ -16,6 +17,10 @@ public class AppProperties {
 
     public Feeding getFeeding() {
         return feeding;
+    }
+
+    public WhiteNoise getWhiteNoise() {
+        return whiteNoise;
     }
 
     public String getTimezone() {
@@ -66,5 +71,16 @@ public class AppProperties {
             this.defaultIntervalMinutes = defaultIntervalMinutes;
         }
     }
-}
 
+    public static class WhiteNoise {
+        private String rootDirectory = "/data/white-noise";
+
+        public String getRootDirectory() {
+            return rootDirectory;
+        }
+
+        public void setRootDirectory(String rootDirectory) {
+            this.rootDirectory = rootDirectory;
+        }
+    }
+}

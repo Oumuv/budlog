@@ -156,6 +156,20 @@ export interface AppSetting {
   reminderVibrateEnabled: boolean;
 }
 
+export interface WhiteNoiseTrack {
+  id: string;
+  name: string;
+  format: "MP3";
+  sizeBytes: number;
+  streamUrl: string;
+}
+
+export interface WhiteNoisePlaylist {
+  id: string;
+  name: string;
+  tracks: WhiteNoiseTrack[];
+}
+
 export interface DailySummary {
   feedingCount: number;
   bottleAmountMl: number;
