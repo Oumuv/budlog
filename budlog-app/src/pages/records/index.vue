@@ -43,9 +43,10 @@ const filterOptions: Array<{ value: RecordFilter; label: string; icon: typeof Li
   { value: "WEIGHT", label: "体重", icon: Scale },
   { value: "EVENT", label: "事件", icon: NotebookPen },
 ];
-const createItems = ["喂奶", "存奶", "尿便", "体重", "事件"];
+const createItems = ["亲喂计时", "瓶喂", "存奶", "尿便", "体重", "事件"];
 const createUrls = [
-  "/pages/feeding/index",
+  "/pages/feeding/index?mode=timer",
+  "/pages/feeding/index?mode=bottle",
   "/pages/milk-storage/index",
   "/pages/diaper/index",
   "/pages/weight/index",

@@ -17,6 +17,9 @@ public interface FeedingRepository extends JpaRepository<FeedingRecord, Long> {
 
     Optional<FeedingRecord> findFirstByBabyIdAndDeletedAtIsNullOrderByStartTimeDesc(Long babyId);
 
+    Optional<FeedingRecord> findFirstByBabyIdAndDeletedAtIsNullAndFeedingTypeInOrderByStartTimeDesc(
+            Long babyId, List<FeedingType> feedingTypes);
+
     Optional<FeedingRecord> findFirstByBabyIdAndDeletedAtIsNullAndStartTimeLessThanOrderByStartTimeDesc(
             Long babyId, OffsetDateTime startTime);
 
@@ -34,4 +37,3 @@ public interface FeedingRepository extends JpaRepository<FeedingRecord, Long> {
     List<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullAndStartTimeGreaterThanEqualAndStartTimeLessThanOrderByStartTimeDesc(
             Long babyId, OffsetDateTime from, OffsetDateTime to);
 }
-

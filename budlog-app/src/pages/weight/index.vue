@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { Save, Trash2 } from "lucide-vue-next";
-import { NButton, NInput, NInputNumber } from "naive-ui";
+import { NButton, NInputNumber } from "naive-ui";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { api } from "../../api";
 import DateTimeField from "../../components/DateTimeField.vue";
+import OptionalNoteField from "../../components/OptionalNoteField.vue";
 import AppLoading from "../../components/AppLoading.vue";
 import AppPage from "../../components/AppPage.vue";
 import PageHeader from "../../components/PageHeader.vue";
@@ -175,8 +176,8 @@ function remove() {
 
     <view v-else class="weight-form surface">
       <view class="field">
-        <text class="field__label">测量时间</text>
-        <DateTimeField v-model="form.measuredAt" title="选择测量时间" quick-record :max-now-offset-minutes="5" />
+        <text class="field__label">测量日期</text>
+        <DateTimeField v-model="form.measuredAt" title="选择测量日期" date-only :max-now-offset-minutes="0" />
       </view>
 
       <view class="field">
@@ -195,10 +196,7 @@ function remove() {
         </view>
       </view>
 
-      <view class="field">
-        <text class="field__label">备注</text>
-        <NInput v-model:value="form.note" type="textarea" :maxlength="500" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="可选" />
-      </view>
+      <OptionalNoteField v-model="form.note" />
 
       <view class="form-actions">
         <NButton v-if="recordId" type="error" size="large" secondary block :loading="deleting" @click="remove"><Trash2 :size="18" />删除</NButton>

@@ -1,48 +1,57 @@
 <script setup lang="ts">
-import { CalendarClock, ChevronRight } from "lucide-vue-next";
-import { NDatePicker } from "naive-ui";
+import { AlertCircle, CalendarClock, Check, ChevronRight, X } from "lucide-vue-next";
+import { NButton, NDatePicker, NDrawer } from "naive-ui";
 import { computed, ref } from "vue";
-import { nowLocalInput, toIso, toLocalInput, todayKey } from "../utils/date";
+import { nowLocalInput, shiftDay, toIso, toLocalInput, todayKey } from "../utils/date";
 
-type DateTimeParts = [number, number, number, number, number];
-
-interface MultiSelectorChangeEvent {
-  detail: { value: Array<number | string> };
-}
-
-interface MultiSelectorColumnChangeEvent {
-  detail: { column: number | string; value: number | string };
-}
+type DayMode = "TODAY" | "YESTERDAY" | "OTHER";
 
 const props = withDefaults(defineProps<{
   modelValue: string;
   title?: string;
   quickRecord?: boolean;
+  dateOnly?: boolean;
   minDate?: number;
   maxDate?: number;
   maxNowOffsetMinutes?: number;
 }>(), {
   title: "选择日期和时间",
   quickRecord: false,
+  dateOnly: false,
 });
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 
 const defaultMinDate = new Date(2000, 0, 1).getTime();
 const defaultMaxDate = new Date(2100, 11, 31, 23, 59).getTime();
 const currentBoundary = ref(Date.now());
-const pickerColumns = ref<string[][]>([]);
-const pickerIndexes = ref<number[]>([0, 0, 0, 0, 0]);
+const sheetOpen = ref(false);
+const draftDayMode = ref<DayMode>("TODAY");
+const draftDate = ref("");
+const draftTime = ref("");
+const draftError = ref("");
 const resolvedMinDate = computed(() => props.minDate ?? defaultMinDate);
 const resolvedMaxDate = computed(() => {
   if (props.maxNowOffsetMinutes !== undefined) return currentBoundary.value + props.maxNowOffsetMinutes * 60_000;
   return props.maxDate ?? defaultMaxDate;
 });
-const pickerMinDate = computed(() => Math.ceil(resolvedMinDate.value / 60_000) * 60_000);
-const pickerMaxDate = computed(() => Math.floor(resolvedMaxDate.value / 60_000) * 60_000);
+const resolvedMinLocal = computed(() => toLocalInput(new Date(resolvedMinDate.value).toISOString()));
+const resolvedMaxLocal = computed(() => toLocalInput(new Date(resolvedMaxDate.value).toISOString()));
+const minDateKey = computed(() => resolvedMinLocal.value.slice(0, 10));
+const maxDateKey = computed(() => resolvedMaxLocal.value.slice(0, 10));
+const minTime = computed(() => draftDate.value === minDateKey.value ? resolvedMinLocal.value.slice(11, 16) : undefined);
+const maxTime = computed(() => draftDate.value === maxDateKey.value ? resolvedMaxLocal.value.slice(11, 16) : undefined);
+const showDayPresets = computed(() => props.quickRecord || props.dateOnly);
+const showDatePicker = computed(() => !showDayPresets.value || draftDayMode.value === "OTHER");
+const sheetHeight = computed(() => {
+  if (props.quickRecord && !props.dateOnly) return "min(520px, calc(100dvh - 12px))";
+  if (props.dateOnly) return "min(350px, calc(100dvh - 12px))";
+  return "min(420px, calc(100dvh - 12px))";
+});
 const recordShortcuts = [
-  { label: "现在", offsetMinutes: 0 },
-  { label: "5 分钟前", offsetMinutes: -5 },
-  { label: "15 分钟前", offsetMinutes: -15 },
+  { label: "刚刚", offsetMinutes: 0 },
+  { label: "10 分钟前", offsetMinutes: -10 },
+  { label: "30 分钟前", offsetMinutes: -30 },
+  { label: "1 小时前", offsetMinutes: -60 },
 ];
 
 const pickerValue = computed({
@@ -54,24 +63,30 @@ const pickerValue = computed({
     }
   },
   set(value: string | number) {
-    emit("update:modelValue", toLocalInput(new Date(Number(value)).toISOString()));
+    const nextValue = toLocalInput(new Date(Number(value)).toISOString());
+    if (!props.dateOnly) {
+      emit("update:modelValue", nextValue);
+      return;
+    }
+    const currentValue = validLocalValue(props.modelValue) || nowLocalInput();
+    emit("update:modelValue", dateOnlyValue(nextValue.slice(0, 10), currentValue.slice(11, 16)));
   },
 });
 
 const displayValue = computed(() => {
   const [date = "", time = ""] = props.modelValue.split("T");
-  if (!date || !time) return "请选择时间";
-  if (date === todayKey()) return `今天 ${time}`;
-  const [year, month, day] = date.split("-");
-  return `${year}年${month}月${day}日 ${time}`;
+  if (!date || (!props.dateOnly && !time)) return props.dateOnly ? "请选择日期" : "请选择时间";
+  const today = todayKey();
+  const dayLabel = date === today
+    ? "今天"
+    : date === shiftDay(today, -1)
+      ? "昨天"
+      : formatDate(date);
+  if (props.dateOnly) return dayLabel;
+  const shortcut = recordShortcuts.find(({ offsetMinutes }) => shortcutActive(offsetMinutes));
+  if (date === today && shortcut) return `${shortcut.label} · ${time}`;
+  return `${dayLabel} ${time}`;
 });
-
-function selectShortcut(offsetMinutes: number) {
-  refreshCurrentBoundary();
-  const instant = Date.now() + offsetMinutes * 60_000;
-  const clamped = Math.min(resolvedMaxDate.value, Math.max(resolvedMinDate.value, instant));
-  emit("update:modelValue", toLocalInput(new Date(clamped).toISOString()));
-}
 
 function refreshCurrentBoundary() {
   currentBoundary.value = Date.now();
@@ -79,151 +94,119 @@ function refreshCurrentBoundary() {
 
 function shortcutActive(offsetMinutes: number) {
   try {
-    return Math.abs(new Date(toIso(props.modelValue)).getTime() - (Date.now() + offsetMinutes * 60_000)) < 60_000;
+    const expected = currentBoundary.value + offsetMinutes * 60_000;
+    return Math.abs(new Date(toIso(props.modelValue)).getTime() - expected) < 90_000;
   } catch {
     return false;
   }
 }
 
-function preparePicker() {
+function selectShortcut(offsetMinutes: number) {
   refreshCurrentBoundary();
-  const min = pickerMinDate.value;
-  const max = pickerMaxDate.value;
-  if (max < min) {
-    showPickerError("日期时间范围配置无效");
-    return;
-  }
-
-  let instant = Date.now();
-  try {
-    instant = new Date(toIso(props.modelValue || nowLocalInput())).getTime();
-  } catch {
-    // Invalid external values fall back to the current time before clamping.
-  }
-  const clamped = Math.min(max, Math.max(min, instant));
-  rebuildPicker(parseLocalParts(toLocalInput(new Date(clamped).toISOString())));
+  const instant = currentBoundary.value + offsetMinutes * 60_000;
+  const clamped = Math.min(resolvedMaxDate.value, Math.max(resolvedMinDate.value, instant));
+  emit("update:modelValue", toLocalInput(new Date(clamped).toISOString()));
+  sheetOpen.value = false;
 }
 
-function updatePickerColumn(event: MultiSelectorColumnChangeEvent) {
-  const column = Number(event.detail.column);
-  const value = Number(event.detail.value);
-  if (!Number.isInteger(column) || column < 0 || column > 4 || !Number.isInteger(value)) return;
-
-  const indexes = [...pickerIndexes.value];
-  indexes[column] = value;
-  rebuildPicker(partsFromIndexes(indexes));
+function openSheet() {
+  refreshCurrentBoundary();
+  const value = validLocalValue(props.modelValue) || nowLocalInput();
+  draftDate.value = value.slice(0, 10);
+  draftTime.value = value.slice(11, 16);
+  draftDayMode.value = dayModeFor(draftDate.value);
+  draftError.value = "";
+  sheetOpen.value = true;
 }
 
-function confirmPicker(event: MultiSelectorChangeEvent) {
+function closeSheet() {
+  sheetOpen.value = false;
+  draftError.value = "";
+}
+
+function selectDraftDayMode(mode: DayMode) {
+  draftDayMode.value = mode;
+  if (mode === "TODAY") draftDate.value = todayKey();
+  if (mode === "YESTERDAY") draftDate.value = shiftDay(todayKey(), -1);
+  draftTime.value = clampedTime(draftDate.value, draftTime.value);
+  draftError.value = "";
+}
+
+function updateDraftDate(event: { detail: { value: string } }) {
+  draftDate.value = event.detail.value;
+  draftDayMode.value = dayModeFor(draftDate.value);
+  draftError.value = "";
+}
+
+function updateDraftTime(event: { detail: { value: string } }) {
+  draftTime.value = event.detail.value;
+  draftError.value = "";
+}
+
+function confirmDraft() {
   refreshCurrentBoundary();
-  const value = formatLocalParts(partsFromIndexes(event.detail.value.map(Number)));
+  const value = props.dateOnly ? dateOnlyDraftValue() : `${draftDate.value}T${draftTime.value}`;
   try {
     const instant = new Date(toIso(value)).getTime();
     if (instant < resolvedMinDate.value) {
-      showPickerError(`不能早于${formatBoundary(resolvedMinDate.value)}`);
+      draftError.value = `不能早于${formatBoundary(resolvedMinLocal.value)}`;
       return;
     }
     if (instant > resolvedMaxDate.value) {
-      showPickerError(props.maxNowOffsetMinutes !== undefined
-        ? "所选时间不能晚于当前允许时间"
-        : `不能晚于${formatBoundary(resolvedMaxDate.value)}`);
+      draftError.value = props.maxNowOffsetMinutes !== undefined
+        ? `所选${props.dateOnly ? "日期" : "时间"}不能晚于当前允许范围`
+        : `不能晚于${formatBoundary(resolvedMaxLocal.value)}`;
       return;
     }
     emit("update:modelValue", value);
+    closeSheet();
   } catch (exception) {
-    showPickerError(exception instanceof Error ? exception.message : "请选择有效的日期和时间");
+    draftError.value = exception instanceof Error ? exception.message : "请选择有效的日期和时间";
   }
 }
 
-function rebuildPicker(preferred: DateTimeParts) {
-  const min = parseLocalParts(toLocalInput(new Date(pickerMinDate.value).toISOString()));
-  const max = parseLocalParts(toLocalInput(new Date(pickerMaxDate.value).toISOString()));
-
-  const year = clamp(preferred[0], min[0], max[0]);
-  const monthStart = year === min[0] ? min[1] : 1;
-  const monthEnd = year === max[0] ? max[1] : 12;
-  const month = clamp(preferred[1], monthStart, monthEnd);
-
-  const atMinMonth = year === min[0] && month === min[1];
-  const atMaxMonth = year === max[0] && month === max[1];
-  const dayStart = atMinMonth ? min[2] : 1;
-  const dayEnd = atMaxMonth ? max[2] : daysInMonth(year, month);
-  const day = clamp(preferred[2], dayStart, dayEnd);
-
-  const atMinDay = atMinMonth && day === min[2];
-  const atMaxDay = atMaxMonth && day === max[2];
-  const hourStart = atMinDay ? min[3] : 0;
-  const hourEnd = atMaxDay ? max[3] : 23;
-  const hour = clamp(preferred[3], hourStart, hourEnd);
-
-  const atMinHour = atMinDay && hour === min[3];
-  const atMaxHour = atMaxDay && hour === max[3];
-  const minuteStart = atMinHour ? min[4] : 0;
-  const minuteEnd = atMaxHour ? max[4] : 59;
-  const minute = clamp(preferred[4], minuteStart, minuteEnd);
-
-  pickerColumns.value = [
-    createOptions(min[0], max[0], "年", false),
-    createOptions(monthStart, monthEnd, "月"),
-    createOptions(dayStart, dayEnd, "日"),
-    createOptions(hourStart, hourEnd, "时"),
-    createOptions(minuteStart, minuteEnd, "分"),
-  ];
-  pickerIndexes.value = [
-    year - min[0],
-    month - monthStart,
-    day - dayStart,
-    hour - hourStart,
-    minute - minuteStart,
-  ];
+function dateOnlyDraftValue(): string {
+  const currentValue = validLocalValue(props.modelValue) || nowLocalInput();
+  return dateOnlyValue(draftDate.value, currentValue.slice(11, 16));
 }
 
-function partsFromIndexes(indexes: number[]): DateTimeParts {
-  return pickerColumns.value.map((options, column) => {
-    const fallback = pickerIndexes.value[column] ?? 0;
-    const index = clamp(Number.isFinite(indexes[column]) ? indexes[column] : fallback, 0, Math.max(0, options.length - 1));
-    return Number.parseInt(options[index] || "0", 10);
-  }) as DateTimeParts;
+function dateOnlyValue(date: string, preferredTime: string): string {
+  return `${date}T${clampedTime(date, preferredTime)}`;
 }
 
-function parseLocalParts(value: string): DateTimeParts {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
-  if (!match) throw new Error("时间格式不正确");
-  return match.slice(1).map(Number) as DateTimeParts;
+function clampedTime(date: string, preferredTime: string): string {
+  let time = preferredTime;
+  const minimum = date === minDateKey.value ? resolvedMinLocal.value.slice(11, 16) : undefined;
+  const maximum = date === maxDateKey.value ? resolvedMaxLocal.value.slice(11, 16) : undefined;
+  if (minimum && time < minimum) time = minimum;
+  if (maximum && time > maximum) time = maximum;
+  return time;
 }
 
-function formatLocalParts(parts: DateTimeParts): string {
-  return `${parts[0]}-${pad(parts[1])}-${pad(parts[2])}T${pad(parts[3])}:${pad(parts[4])}`;
+function dayModeFor(date: string): DayMode {
+  if (date === todayKey()) return "TODAY";
+  if (date === shiftDay(todayKey(), -1)) return "YESTERDAY";
+  return "OTHER";
 }
 
-function formatBoundary(instant: number): string {
-  return toLocalInput(new Date(instant).toISOString()).replace("T", " ");
+function validLocalValue(value: string): string | undefined {
+  try {
+    toIso(value);
+    return value;
+  } catch {
+    return undefined;
+  }
 }
 
-function createOptions(start: number, end: number, suffix: string, padded = true): string[] {
-  return Array.from({ length: end - start + 1 }, (_, index) => {
-    const value = start + index;
-    return `${padded ? pad(value) : value}${suffix}`;
-  });
+function formatDate(value: string): string {
+  const [year, month, day] = value.split("-");
+  return `${year}年${month}月${day}日`;
 }
 
-function daysInMonth(year: number, month: number): number {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+function formatBoundary(value: string): string {
+  const [date, time] = value.split("T");
+  return `${date} ${time}`;
 }
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
-function showPickerError(title: string) {
-  uni.showToast({ title, icon: "none" });
-}
-
-preparePicker();
 </script>
 
 <template>
@@ -231,46 +214,124 @@ preparePicker();
     <NDatePicker
       v-model:value="pickerValue"
       class="date-time-field__desktop"
-      type="datetime"
+      :type="dateOnly ? 'date' : 'datetime'"
       :placeholder="title"
       :min-date="resolvedMinDate"
       :max-date="resolvedMaxDate"
       :clearable="false"
-      format="yyyy-MM-dd HH:mm"
+      :format="dateOnly ? 'yyyy-MM-dd' : 'yyyy-MM-dd HH:mm'"
       @focus="refreshCurrentBoundary"
     />
-    <picker
-      class="date-time-field__mobile-picker"
-      mode="multiSelector"
-      :range="pickerColumns"
-      :value="pickerIndexes"
-      @click="preparePicker"
-      @columnchange="updatePickerColumn"
-      @change="confirmPicker"
+    <button
+      class="date-time-field__mobile-trigger"
+      :aria-label="`${title}，当前为${displayValue}`"
+      hover-class="none"
+      @click="openSheet"
     >
-      <button
-        class="date-time-field__mobile-trigger"
-        :aria-label="`${title}，当前为${displayValue}`"
-        hover-class="none"
-      >
-        <view class="date-time-field__mobile-icon"><CalendarClock :size="20" /></view>
-        <text class="date-time-field__mobile-value">{{ displayValue }}</text>
-        <ChevronRight class="date-time-field__mobile-arrow" :size="19" />
-      </button>
-    </picker>
-    <view v-if="quickRecord" class="date-time-field__shortcuts">
-      <button
-        v-for="shortcut in recordShortcuts"
-        :key="shortcut.label"
-        class="date-time-field__shortcut"
-        :class="{ 'date-time-field__shortcut--active': shortcutActive(shortcut.offsetMinutes) }"
-        :aria-pressed="shortcutActive(shortcut.offsetMinutes)"
-        hover-class="none"
-        @click="selectShortcut(shortcut.offsetMinutes)"
-      >
-        {{ shortcut.label }}
-      </button>
-    </view>
+      <view class="date-time-field__mobile-icon"><CalendarClock :size="20" /></view>
+      <text class="date-time-field__mobile-value">{{ displayValue }}</text>
+      <text class="date-time-field__mobile-action">修改</text>
+    </button>
+
+    <NDrawer
+      v-model:show="sheetOpen"
+      class="date-time-drawer"
+      placement="bottom"
+      :height="sheetHeight"
+      :z-index="800"
+      :auto-focus="false"
+    >
+      <view class="date-time-sheet">
+        <view class="date-time-sheet__handle" />
+        <view class="date-time-sheet__header">
+          <text class="date-time-sheet__title">{{ title }}</text>
+          <text class="date-time-sheet__current">当前选择：{{ displayValue }}</text>
+        </view>
+
+        <view v-if="quickRecord && !dateOnly" class="date-time-sheet__shortcuts" aria-label="快捷时间">
+          <button
+            v-for="shortcut in recordShortcuts"
+            :key="shortcut.label"
+            class="date-time-sheet__shortcut"
+            :class="{ 'date-time-sheet__shortcut--active': shortcutActive(shortcut.offsetMinutes) }"
+            :aria-pressed="shortcutActive(shortcut.offsetMinutes)"
+            hover-class="none"
+            @click="selectShortcut(shortcut.offsetMinutes)"
+          >
+            {{ shortcut.label }}
+          </button>
+        </view>
+
+        <view v-if="showDayPresets" class="date-time-sheet__day-presets" aria-label="选择日期范围">
+          <button
+            class="date-time-sheet__day-button"
+            :class="{ 'date-time-sheet__day-button--active': draftDayMode === 'TODAY' }"
+            :aria-pressed="draftDayMode === 'TODAY'"
+            hover-class="none"
+            @click="selectDraftDayMode('TODAY')"
+          >今天</button>
+          <button
+            class="date-time-sheet__day-button"
+            :class="{ 'date-time-sheet__day-button--active': draftDayMode === 'YESTERDAY' }"
+            :aria-pressed="draftDayMode === 'YESTERDAY'"
+            hover-class="none"
+            @click="selectDraftDayMode('YESTERDAY')"
+          >昨天</button>
+          <button
+            class="date-time-sheet__day-button"
+            :class="{ 'date-time-sheet__day-button--active': draftDayMode === 'OTHER' }"
+            :aria-pressed="draftDayMode === 'OTHER'"
+            hover-class="none"
+            @click="selectDraftDayMode('OTHER')"
+          >其他日期</button>
+        </view>
+
+        <view class="date-time-sheet__fields">
+          <view v-if="showDatePicker" class="date-time-sheet__field">
+            <text class="date-time-sheet__label">日期</text>
+            <picker
+              class="date-time-sheet__picker"
+              mode="date"
+              :value="draftDate"
+              :start="minDateKey"
+              :end="maxDateKey"
+              @change="updateDraftDate"
+            >
+              <view class="date-time-sheet__picker-value" aria-label="选择日期">
+                <text>{{ draftDate }}</text>
+                <ChevronRight :size="19" />
+              </view>
+            </picker>
+          </view>
+          <view v-if="!dateOnly" class="date-time-sheet__field">
+            <text class="date-time-sheet__label">具体时间</text>
+            <picker
+              class="date-time-sheet__picker"
+              mode="time"
+              :value="draftTime"
+              :start="minTime"
+              :end="maxTime"
+              @change="updateDraftTime"
+            >
+              <view class="date-time-sheet__picker-value" aria-label="选择具体时间">
+                <text>{{ draftTime }}</text>
+                <ChevronRight :size="19" />
+              </view>
+            </picker>
+          </view>
+        </view>
+
+        <view v-if="draftError" class="date-time-sheet__error" role="alert">
+          <AlertCircle :size="16" />
+          <text>{{ draftError }}</text>
+        </view>
+
+        <view class="date-time-sheet__actions">
+          <NButton size="large" secondary @click="closeSheet"><X :size="18" />取消</NButton>
+          <NButton type="primary" size="large" @click="confirmDraft"><Check :size="18" />{{ dateOnly ? "确认日期" : "确认时间" }}</NButton>
+        </view>
+      </view>
+    </NDrawer>
   </view>
 </template>
 
@@ -279,61 +340,166 @@ preparePicker();
   width: 100%;
 }
 
-.date-time-field__mobile-picker,
 .date-time-field__mobile-trigger {
   display: none;
 }
 
-.date-time-field__shortcuts {
-  display: none;
-  gap: 7px;
-  margin-top: 9px;
+.date-time-sheet {
+  box-sizing: border-box;
+  display: flex;
+  width: min(100%, 430px);
+  height: 100%;
+  margin: 0 auto;
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom));
+  flex-direction: column;
 }
 
-.date-time-field__shortcut {
+.date-time-sheet__handle {
+  width: 38px;
+  height: 4px;
+  margin: 0 auto 12px;
+  border-radius: 2px;
+  background: var(--bud-color-line);
+}
+
+.date-time-sheet__header {
+  margin-bottom: 13px;
+  text-align: center;
+}
+
+.date-time-sheet__title,
+.date-time-sheet__current,
+.date-time-sheet__label {
+  display: block;
+}
+
+.date-time-sheet__title {
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 760;
+}
+
+.date-time-sheet__current {
+  margin-top: 2px;
+  color: var(--bud-color-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.date-time-sheet__shortcuts,
+.date-time-sheet__day-presets {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 13px;
+}
+
+.date-time-sheet__shortcuts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.date-time-sheet__day-presets {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.date-time-sheet__shortcut,
+.date-time-sheet__day-button {
   box-sizing: border-box;
   display: flex;
   width: 100%;
-  min-height: 36px;
+  min-height: 46px;
   appearance: none;
   align-items: center;
   justify-content: center;
   margin: 0;
-  padding: 0 14px;
+  padding: 0 8px;
   border: 1px solid var(--bud-color-line);
   border-radius: 8px;
   color: var(--bud-color-ink);
   background: var(--bud-color-surface);
   cursor: pointer;
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 700;
   line-height: 20px;
   touch-action: manipulation;
   transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease, transform 0.1s ease;
 }
 
-.date-time-field__shortcut--active {
+.date-time-sheet__shortcut--active,
+.date-time-sheet__day-button--active {
   border-color: var(--bud-color-primary-dark);
-  color: #ffffff;
+  color: #fff;
   background: var(--bud-color-primary-dark);
   box-shadow: 0 2px 7px rgba(201, 54, 105, 0.2);
 }
 
-.date-time-field__shortcut:active:not(.date-time-field__shortcut--active) {
+.date-time-sheet__shortcut:active,
+.date-time-sheet__day-button:active {
+  transform: scale(0.98);
+}
+
+.date-time-sheet__fields {
+  display: grid;
+  gap: 12px;
+}
+
+.date-time-sheet__label {
+  margin-bottom: 6px;
+  color: var(--bud-color-body);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.date-time-sheet__picker {
+  display: block;
+}
+
+.date-time-sheet__picker-value {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  height: 50px;
+  padding: 0 13px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--bud-color-line);
+  border-radius: 8px;
+  color: var(--bud-color-ink);
+  background: var(--bud-color-surface);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.date-time-sheet__picker-value:active {
   border-color: var(--bud-color-primary);
   background: var(--bud-color-primary-soft);
-  transform: scale(0.98);
+  box-shadow: 0 0 0 3px rgba(255, 93, 143, 0.12);
 }
 
-.date-time-field__shortcut--active:active {
-  border-color: var(--baby-primary-pressed);
-  background: var(--baby-primary-pressed);
-  transform: scale(0.98);
+.date-time-sheet__picker-value .lucide {
+  color: var(--bud-color-muted);
 }
 
-.date-time-field__shortcut:focus-visible {
-  outline: 2px solid rgba(255, 93, 143, 0.32);
-  outline-offset: 2px;
+.date-time-sheet__error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--baby-danger);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.date-time-sheet__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.date-time-sheet__actions :deep(.n-button) {
+  height: 50px;
 }
 
 @media (max-width: 768px), (pointer: coarse) {
@@ -341,19 +507,15 @@ preparePicker();
     display: none;
   }
 
-  .date-time-field__mobile-picker {
-    display: block;
-  }
-
   .date-time-field__mobile-trigger {
     box-sizing: border-box;
     display: grid;
     width: 100%;
-    min-height: 52px;
+    min-height: 54px;
     appearance: none;
     margin: 0;
     padding: 0 12px 0 9px;
-    grid-template-columns: 34px minmax(0, 1fr) 20px;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
     border: 1px solid var(--bud-color-line);
@@ -390,27 +552,21 @@ preparePicker();
   .date-time-field__mobile-value {
     min-width: 0;
     overflow: hidden;
-    font-size: 15px;
+    font-size: 16px;
     font-variant-numeric: tabular-nums;
-    font-weight: 700;
+    font-weight: 750;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .date-time-field__mobile-arrow {
-    color: var(--bud-color-muted);
+  .date-time-field__mobile-action {
+    color: var(--bud-color-primary-dark);
+    font-size: 13px;
+    font-weight: 700;
   }
+}
 
-  .date-time-field__shortcuts {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .date-time-field__shortcut {
-    min-width: 0;
-    min-height: 44px;
-    padding: 0 4px;
-  }
+:deep(.date-time-drawer) {
+  border-radius: 8px 8px 0 0;
 }
 </style>

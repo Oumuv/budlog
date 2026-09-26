@@ -56,6 +56,7 @@ export const api = {
       page: 0,
       size: 100,
     })}`),
+  latestBottleFeeding: () => apiRequest<FeedingRecord | undefined>("/feedings/latest-bottle"),
   feeding: (id: number) => apiRequest<FeedingRecord>(`/feedings/${id}`),
   createFeeding: (data: FeedingInput) => apiRequest<FeedingRecord>("/feedings", { method: "POST", data }),
   updateFeeding: (id: number, data: FeedingInput) =>
