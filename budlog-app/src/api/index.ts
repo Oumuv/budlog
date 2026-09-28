@@ -16,6 +16,7 @@ import type {
   MilestoneInput,
   PageResult,
   TaskInput,
+  TaskRecurrenceScope,
   TaskStatus,
   Timeline,
   TodoTask,
@@ -101,8 +102,8 @@ export const api = {
   dueReminders: () => apiRequest<TodoTask[]>("/tasks/due-reminders"),
   createTask: (data: TaskInput) => apiRequest<TodoTask>("/tasks", { method: "POST", data }),
   updateTask: (id: number, data: TaskInput) => apiRequest<TodoTask>(`/tasks/${id}`, { method: "PUT", data }),
-  updateTaskStatus: (id: number, status: TaskStatus) =>
-    apiRequest<TodoTask>(`/tasks/${id}/status`, { method: "PATCH", data: { status } }),
+  updateTaskStatus: (id: number, status: TaskStatus, recurrenceScope?: TaskRecurrenceScope) =>
+    apiRequest<TodoTask>(`/tasks/${id}/status`, { method: "PATCH", data: { status, recurrenceScope } }),
   deleteTask: (id: number) => apiRequest<void>(`/tasks/${id}`, { method: "DELETE" }),
   settings: () => apiRequest<AppSetting>("/settings"),
   saveSettings: (data: Omit<AppSetting, "feedingIntervalAnchor">) =>

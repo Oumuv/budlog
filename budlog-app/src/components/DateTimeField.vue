@@ -14,10 +14,12 @@ const props = withDefaults(defineProps<{
   minDate?: number;
   maxDate?: number;
   maxNowOffsetMinutes?: number;
+  disabled?: boolean;
 }>(), {
   title: "选择日期和时间",
   quickRecord: false,
   dateOnly: false,
+  disabled: false,
 });
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 
@@ -110,6 +112,7 @@ function selectShortcut(offsetMinutes: number) {
 }
 
 function openSheet() {
+  if (props.disabled) return;
   refreshCurrentBoundary();
   const value = validLocalValue(props.modelValue) || nowLocalInput();
   draftDate.value = value.slice(0, 10);
@@ -219,18 +222,20 @@ function formatBoundary(value: string): string {
       :min-date="resolvedMinDate"
       :max-date="resolvedMaxDate"
       :clearable="false"
+      :disabled="disabled"
       :format="dateOnly ? 'yyyy-MM-dd' : 'yyyy-MM-dd HH:mm'"
       @focus="refreshCurrentBoundary"
     />
     <button
       class="date-time-field__mobile-trigger"
       :aria-label="`${title}，当前为${displayValue}`"
+      :disabled="disabled"
       hover-class="none"
       @click="openSheet"
     >
       <view class="date-time-field__mobile-icon"><CalendarClock :size="20" /></view>
       <text class="date-time-field__mobile-value">{{ displayValue }}</text>
-      <text class="date-time-field__mobile-action">修改</text>
+      <text v-if="!disabled" class="date-time-field__mobile-action">修改</text>
     </button>
 
     <NDrawer
@@ -536,6 +541,12 @@ function formatBoundary(value: string): string {
   .date-time-field__mobile-trigger:focus-visible {
     outline: 2px solid rgba(255, 93, 143, 0.32);
     outline-offset: 2px;
+  }
+
+  .date-time-field__mobile-trigger:disabled {
+    color: var(--bud-color-muted);
+    background: #f7f8fa;
+    cursor: default;
   }
 
   .date-time-field__mobile-icon {

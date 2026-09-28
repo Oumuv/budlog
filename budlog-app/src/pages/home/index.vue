@@ -4,6 +4,7 @@ import {
   Baby,
   BellRing,
   CalendarDays,
+  Check,
   ChevronRight,
   Droplets,
   Milk,
@@ -21,14 +22,19 @@ import AppLoading from "../../components/AppLoading.vue";
 import AppNav from "../../components/AppNav.vue";
 import AppPage from "../../components/AppPage.vue";
 import ErrorState from "../../components/ErrorState.vue";
-import type { Dashboard } from "../../types";
-import { formatDate, formatDuration, setAppTimezone, toLocalInput } from "../../utils/date";
+import type { Dashboard, TodoTask } from "../../types";
+import { formatDate, formatDateTime, formatDuration, setAppTimezone, toLocalInput } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
+import { clearShownReminder } from "../../utils/reminders";
 
 const dashboard = ref<Dashboard>();
 const loading = ref(true);
 const error = ref("");
 const now = ref(Date.now());
+const dueReminders = ref<TodoTask[]>([]);
+const reminderIndex = ref(0);
+const completingReminderId = ref<number>();
+let reminderRefreshPromise: Promise<void> | undefined;
 let clock: ReturnType<typeof setInterval> | undefined;
 
 const calendarAgeDays = computed(() => Math.max(1, dashboard.value?.baby?.ageDayNumber ?? 1));
@@ -53,7 +59,10 @@ onShow(async () => {
   await load();
   now.value = Date.now();
   if (clock) clearInterval(clock);
-  clock = setInterval(() => (now.value = Date.now()), 60_000);
+  clock = setInterval(() => {
+    now.value = Date.now();
+    void refreshDueReminders();
+  }, 60_000);
 });
 
 onHide(stopClock);
@@ -65,11 +74,60 @@ async function load() {
   try {
     dashboard.value = await api.dashboard();
     if (dashboard.value.baby) setAppTimezone(dashboard.value.baby.timezone);
+    await refreshDueReminders();
   } catch (exception) {
     error.value = exception instanceof Error ? exception.message : "首页加载失败";
   } finally {
     loading.value = false;
   }
+}
+
+async function refreshDueReminders(force = false) {
+  if (!dashboard.value?.configured) {
+    dueReminders.value = [];
+    return;
+  }
+  if (reminderRefreshPromise) {
+    await reminderRefreshPromise;
+    if (!force) return;
+  }
+  const refresh = api.dueReminders()
+    .then((tasks) => {
+      dueReminders.value = tasks;
+      if (reminderIndex.value >= dueReminders.value.length) reminderIndex.value = 0;
+    })
+    .catch((exception) => console.warn("首页提醒刷新失败", exception));
+  reminderRefreshPromise = refresh;
+  await refresh;
+  if (reminderRefreshPromise === refresh) reminderRefreshPromise = undefined;
+}
+
+async function completeReminder(task: TodoTask) {
+  if (completingReminderId.value) return;
+  completingReminderId.value = task.id;
+  try {
+    await api.updateTaskStatus(task.id, "DONE");
+    clearShownReminder(task.id);
+    dueReminders.value = dueReminders.value.filter((item) => item.id !== task.id);
+    if (dashboard.value) dashboard.value.tasks = dashboard.value.tasks.filter((item) => item.id !== task.id);
+    if (reminderIndex.value >= dueReminders.value.length) reminderIndex.value = 0;
+    await refreshDueReminders(true);
+    uni.showToast({ title: "已完成", icon: "success" });
+  } catch (exception) {
+    uni.showToast({ title: exception instanceof Error ? exception.message : "任务更新失败", icon: "none" });
+  } finally {
+    completingReminderId.value = undefined;
+  }
+}
+
+function onReminderChange(event: Event) {
+  const current = (event as Event & { detail?: { current?: number } }).detail?.current;
+  if (typeof current === "number") reminderIndex.value = current;
+}
+
+function reminderTiming(task: TodoTask): string {
+  const state = task.overdue ? "已逾期" : "提醒已生效";
+  return `${state} · 到期 ${formatDateTime(task.dueTime)}`;
 }
 
 function go(url: string) {
@@ -127,6 +185,40 @@ function stopClock() {
       </view>
 
       <template v-else-if="dashboard?.baby">
+        <view v-if="dueReminders.length" class="reminder-carousel">
+          <view class="reminder-carousel__head">
+            <view class="reminder-carousel__title"><BellRing :size="16" /><text>待办提醒</text></view>
+            <text class="reminder-carousel__count">{{ reminderIndex + 1 }}/{{ dueReminders.length }}</text>
+          </view>
+          <swiper
+            class="reminder-swiper"
+            :autoplay="dueReminders.length > 1"
+            :circular="dueReminders.length > 1"
+            :current="reminderIndex"
+            :duration="350"
+            :interval="4000"
+            @change="onReminderChange"
+          >
+            <swiper-item v-for="task in dueReminders" :key="task.id">
+              <view class="reminder-slide surface" :class="{ 'reminder-slide--overdue': task.overdue }">
+                <button class="reminder-slide__body" @click="go(`/pages/task-edit/index?id=${task.id}`)">
+                  <text class="reminder-slide__title">{{ task.title }}</text>
+                  <text class="reminder-slide__meta">{{ reminderTiming(task) }}</text>
+                </button>
+                <button
+                  class="reminder-slide__complete"
+                  :disabled="completingReminderId === task.id"
+                  aria-label="完成任务"
+                  title="完成任务"
+                  @click="completeReminder(task)"
+                >
+                  <Check :size="18" />
+                </button>
+              </view>
+            </swiper-item>
+          </swiper>
+        </view>
+
         <view class="baby-card surface">
           <view class="baby-card__hero">
             <view class="baby-card__copy">
@@ -248,6 +340,19 @@ function stopClock() {
 .home-head__bell { position: relative; overflow: visible; }
 .home-head__badge { position: absolute; top: 4px; right: 3px; width: 8px; height: 8px; border: 2px solid var(--bud-color-canvas); border-radius: 50%; background: var(--bud-color-primary); }
 .home-head__avatar { width: 48px; height: 48px; border-radius: 50%; background: #fff0f4; }
+.reminder-carousel { margin-bottom: 11px; }
+.reminder-carousel__head { display: flex; min-height: 27px; align-items: center; justify-content: space-between; padding: 0 4px; }
+.reminder-carousel__title { display: flex; align-items: center; gap: 6px; color: var(--bud-color-primary); font-size: 13px; font-weight: 800; }
+.reminder-carousel__count { color: var(--bud-color-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.reminder-swiper { width: 100%; height: 82px; }
+.reminder-slide { display: grid; min-width: 0; height: 76px; grid-template-columns: minmax(0, 1fr) 38px; align-items: center; gap: 8px; padding: 10px 10px 10px 13px; border-color: #ffd5e2; background: #fff8fa; }
+.reminder-slide--overdue { border-color: #f5c8c8; background: #fff8f8; }
+.reminder-slide__body { display: block; min-width: 0; margin: 0; padding: 0; border: 0; background: transparent; text-align: left; line-height: 1.35; }
+.reminder-slide__title { display: -webkit-box; overflow: hidden; color: var(--bud-color-ink); font-size: 13px; font-weight: 800; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.reminder-slide__meta { display: block; margin-top: 4px; overflow: hidden; color: var(--bud-color-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.reminder-slide--overdue .reminder-slide__meta { color: #c54b57; }
+.reminder-slide__complete { display: flex; width: 34px; height: 34px; align-items: center; justify-content: center; margin: 0; padding: 0; border: 1px solid #f5adc4; border-radius: 50%; color: var(--bud-color-primary); background: #fff; }
+.reminder-slide__complete:disabled { opacity: 0.55; }
 .setup-state { min-height: 360px; }
 .baby-card { overflow: hidden; border-color: #f8e8ef; }
 .baby-card__hero { position: relative; min-height: 126px; overflow: hidden; padding: 17px 18px; background: linear-gradient(110deg, #fff3f7 0%, #ffe3ed 100%); }

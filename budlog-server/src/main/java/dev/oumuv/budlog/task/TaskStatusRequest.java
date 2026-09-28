@@ -11,5 +11,6 @@ public class TaskStatusRequest {
 
     @NotNull(message = "任务状态不能为空")
     private TaskStatus status;
-}
 
+    private TaskRecurrenceScope recurrenceScope;
+}
