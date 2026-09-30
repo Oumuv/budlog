@@ -2,7 +2,7 @@
 
 ## 1. 适用范围
 
-本文档用于在 macOS 本地构建和运行 Budlog，包括开发环境、生产配置预演、日志查看、数据库备份及恢复。
+本文档用于在 macOS 本地构建和运行 Budlog，包括开发环境、生产配置预演、日志查看、数据库备份及恢复。H5 在线发布、Android 壳构建、APK 安装和版本管理见《Budlog 构建发布与 Android 安装指南》。
 
 项目使用一套 PostgreSQL 连接凭据，并通过不同数据库名隔离环境：
 
@@ -18,6 +18,7 @@ PostgreSQL 是外部服务，Compose 不创建数据库容器或数据卷。`bud
 ```text
 <项目目录>/
 ├── budlog-app/       # uni-app H5 前端
+├── budlog-android-shell/ # uni-app Android 薄壳
 ├── budlog-server/    # Spring Boot 后端
 ├── deploy/           # Docker、Compose 与运维脚本
 ├── .env              # 本地环境变量，不提交到 Git
@@ -50,13 +51,7 @@ sdk current java
 
 ## 4. 环境变量
 
-根目录 `.env` 同时供开发和生产 Compose 使用。首次配置且文件不存在时，可执行：
-
-```sh
-cp deploy/.env.example .env
-```
-
-如果 `.env` 已存在，不要用示例文件覆盖。字段说明如下：
+根目录 `.env` 同时供开发和生产 Compose 使用。仓库不提供包含环境值的示例文件；首次配置时按下表手工创建。如果 `.env` 已存在，不要覆盖。
 
 配置完成后收紧本地权限：
 

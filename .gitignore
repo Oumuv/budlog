@@ -7,6 +7,9 @@ deploy/white-noise/
 # Build and dependency output
 budlog-app/node_modules/
 budlog-app/dist/
+budlog-android-shell/node_modules/
+budlog-android-shell/dist/
+budlog-android-shell/unpackage/
 budlog-server/target/
 deploy/budlog-server.jar
 deploy/h5/
@@ -15,3 +18,7 @@ deploy/h5/
 .DS_Store
 *.log
 .*
+!.docs/
+.docs/*
+!.docs/Budlog安卓App与H5共存实施计划.md
+!.docs/Budlog构建发布与Android安装指南.md

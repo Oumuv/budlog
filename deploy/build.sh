@@ -3,6 +3,8 @@ set -e
 
 SCRIPT_DIR=${0:A:h}
 PROJECT_ROOT=${SCRIPT_DIR:h}
+H5_BUILD_DIR="$PROJECT_ROOT/budlog-app/dist/build/h5"
+H5_DEPLOY_DIR="$SCRIPT_DIR/h5"
 
 if (( $# != 0 )); then
   print -u2 "Usage: $0"
@@ -58,21 +60,48 @@ if [[ ! -s "$PROJECT_ROOT/budlog-server/target/budlog-server.jar" ]]; then
   print -u2 "Backend artifact was not generated"
   exit 1
 fi
-if [[ ! -s "$PROJECT_ROOT/budlog-app/dist/build/h5/index.html" ]]; then
+if [[ ! -s "$H5_BUILD_DIR/index.html" ]]; then
   print -u2 "Frontend artifact was not generated"
+  exit 1
+fi
+if [[ ! -s "$H5_BUILD_DIR/version.json" ]]; then
+  print -u2 "Frontend version metadata was not generated"
   exit 1
 fi
 
 cp "$PROJECT_ROOT/budlog-server/target/budlog-server.jar" "$SCRIPT_DIR/budlog-server.jar"
-mkdir -p "$SCRIPT_DIR/h5"
-rsync -a --delete "$PROJECT_ROOT/budlog-app/dist/build/h5/" "$SCRIPT_DIR/h5/"
+mkdir -p "$H5_DEPLOY_DIR"
+
+# Keep previously published hashed assets so already-open clients can finish loading them.
+rsync -a \
+  --exclude '/index.html' \
+  --exclude '/version.json' \
+  "$H5_BUILD_DIR/" "$H5_DEPLOY_DIR/"
+
+H5_INDEX_TEMP="$H5_DEPLOY_DIR/.index.html.$$"
+H5_VERSION_TEMP="$H5_DEPLOY_DIR/.version.json.$$"
+cleanup_staged_frontend_entries() {
+  rm -f "$H5_INDEX_TEMP" "$H5_VERSION_TEMP"
+}
+trap cleanup_staged_frontend_entries EXIT
+
+cp "$H5_BUILD_DIR/index.html" "$H5_INDEX_TEMP"
+cp "$H5_BUILD_DIR/version.json" "$H5_VERSION_TEMP"
+chmod 0644 "$H5_INDEX_TEMP" "$H5_VERSION_TEMP"
+mv -f "$H5_INDEX_TEMP" "$H5_DEPLOY_DIR/index.html"
+mv -f "$H5_VERSION_TEMP" "$H5_DEPLOY_DIR/version.json"
+trap - EXIT
 
 if [[ ! -s "$SCRIPT_DIR/budlog-server.jar" ]]; then
   print -u2 "Backend deployment artifact was not copied"
   exit 1
 fi
-if [[ ! -s "$SCRIPT_DIR/h5/index.html" ]]; then
+if [[ ! -s "$H5_DEPLOY_DIR/index.html" ]]; then
   print -u2 "Frontend deployment artifact was not copied"
+  exit 1
+fi
+if [[ ! -s "$H5_DEPLOY_DIR/version.json" ]]; then
+  print -u2 "Frontend version metadata was not copied"
   exit 1
 fi
 

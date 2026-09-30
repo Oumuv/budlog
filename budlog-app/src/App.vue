@@ -2,6 +2,7 @@
 import { onHide, onLaunch, onShow } from "@dcloudio/uni-app";
 import { useWhiteNoisePlayerStore } from "./stores/whiteNoisePlayer";
 import { initializePwa } from "./utils/pwa";
+import { checkForH5Update } from "./utils/release";
 import { startReminderLoop, stopReminderLoop } from "./utils/reminders";
 
 const whiteNoisePlayer = useWhiteNoisePlayerStore();
@@ -11,6 +12,7 @@ onLaunch(() => {
   whiteNoisePlayer.initialize();
 });
 onShow(() => {
+  void checkForH5Update();
   startReminderLoop();
   whiteNoisePlayer.handleResume();
 });

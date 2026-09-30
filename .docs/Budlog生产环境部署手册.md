@@ -1,4 +1,6 @@
-# Budlog 生产环境部署步骤
+# Budlog 生产环境部署步骤（历史，已废弃）
+
+> 警告：本文档保留为历史记录，其中“开发与生产共用同一个逻辑数据库”的方案已经废弃，不得继续执行。当前环境分别使用 `budlog_dev` 和 `budlog`，构建、发布与 Android 安装以《Budlog 构建发布与 Android 安装指南》和《Budlog 本地构建与运行指南》为准。
 
 适用于 Linux 服务器 Docker Compose v2 部署。PostgreSQL 为外部服务，dev 和 prod 使用同一个逻辑数据库。以下开发机命令均在项目根目录执行。
 
