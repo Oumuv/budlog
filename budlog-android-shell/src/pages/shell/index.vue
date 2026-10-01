@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, ref } from "vue";
 import { onBackPress, onReady, onUnload } from "@dcloudio/uni-app";
-import { parseHttpsUrl, resolveShellEnvironment } from "@/config/environment";
+import { BRIDGE_VERSION, parseHttpsUrl, resolveShellEnvironment } from "@/config/environment";
+import {
+  consumeShortcutRoute,
+  dispatchNative,
+  getNativeState,
+  initializeNative,
+} from "@/uni_modules/budlog-native";
 
 type ShellState = "configuration-error" | "error" | "loading" | "offline" | "ready";
 
@@ -12,6 +18,9 @@ type RemoteWebviewStyles = PlusWebviewWebviewStyles & {
 const LOAD_TIMEOUT_MS = 20_000;
 const WEBVIEW_READY_TIMEOUT_MS = 3_000;
 const WEBVIEW_POLL_INTERVAL_MS = 50;
+const NATIVE_STATE_POLL_INTERVAL_MS = 500;
+const NATIVE_MEDIA_URL_PREFIX = "budlog-native://media?payload=";
+const MAX_NATIVE_MEDIA_URL_LENGTH = 196_608;
 
 const REMOTE_WEBVIEW_STYLES: RemoteWebviewStyles = {
   "uni-app": "none",
@@ -33,6 +42,10 @@ type PageProxyWithScope = {
   };
 };
 
+type OverrideUrlResult = {
+  url?: string;
+};
+
 const environmentResult = resolveShellEnvironment();
 const pageInstance = getCurrentInstance();
 const shellState = ref<ShellState>(environmentResult.ok ? "loading" : "configuration-error");
@@ -45,6 +58,10 @@ let activeAttempt = 0;
 let loadTimeout: ReturnType<typeof setTimeout> | null = null;
 let remoteWebview: PlusWebviewWebviewObject | null = null;
 let backCheckWebview: PlusWebviewWebviewObject | null = null;
+let nativeInitialized = false;
+let nativeStateInterval: ReturnType<typeof setInterval> | null = null;
+let lastNativeState = "";
+let pendingShortcutRoute = "";
 
 const stateTitle = computed(() => {
   switch (shellState.value) {
@@ -70,7 +87,99 @@ function clearLoadTimeout(): void {
   }
 }
 
+function stopNativeStatePolling(): void {
+  if (nativeStateInterval === null) return;
+  clearInterval(nativeStateInterval);
+  nativeStateInterval = null;
+}
+
+function emitRemoteEvent(eventName: string, detailJson: string): void {
+  const webview = remoteWebview;
+  if (!webview || shellState.value !== "ready") return;
+  try {
+    JSON.parse(detailJson);
+    webview.evalJS(
+      `window.dispatchEvent(new CustomEvent(${JSON.stringify(eventName)},{detail:JSON.parse(${JSON.stringify(detailJson)})}));`,
+    );
+  } catch {
+    // Native values must be valid JSON before they cross into the remote page.
+  }
+}
+
+function installRemoteNativeBridge(webview: PlusWebviewWebviewObject): void {
+  if (!nativeInitialized) return;
+  const prefix = JSON.stringify(NATIVE_MEDIA_URL_PREFIX);
+  const version = JSON.stringify(BRIDGE_VERSION);
+  webview.evalJS(`(function(){var bridge=Object.freeze({version:${version},dispatch:function(payload){if(typeof payload!=="string"||payload.length===0||payload.length>65536){throw new Error("Invalid native media command.");}window.location.href=${prefix}+encodeURIComponent(payload);}});try{Object.defineProperty(window,"BudlogNativeMedia",{value:bridge,writable:false,configurable:false});}catch(e){window.BudlogNativeMedia=bridge;}window.dispatchEvent(new CustomEvent("budlog-native-ready",{detail:{version:${version}}}));})();`);
+}
+
+function pollNativeState(): void {
+  if (!nativeInitialized || shellState.value !== "ready") return;
+  try {
+    const state = getNativeState();
+    if (!state || state === lastNativeState) return;
+    JSON.parse(state);
+    lastNativeState = state;
+    emitRemoteEvent("budlog-native-media-state", state);
+  } catch {
+    stopNativeStatePolling();
+  }
+}
+
+function startNativeStatePolling(): void {
+  if (!nativeInitialized || nativeStateInterval !== null) return;
+  pollNativeState();
+  nativeStateInterval = setInterval(pollNativeState, NATIVE_STATE_POLL_INTERVAL_MS);
+}
+
+function deliverPendingShortcut(): void {
+  const webview = remoteWebview;
+  if (!pendingShortcutRoute || !webview || shellState.value !== "ready") return;
+  const route = pendingShortcutRoute;
+  const routeJson = JSON.stringify(route);
+  const detailJson = JSON.stringify(JSON.stringify({ route }));
+  try {
+    webview.evalJS(
+      `(function(){var route=${routeJson};var targetHash="#"+route;if(window.location.hash===targetHash){return;}var event=new CustomEvent("budlog-native-shortcut",{detail:JSON.parse(${detailJson}),cancelable:true});var handled=!window.dispatchEvent(event);if(!handled){window.location.hash=targetHash;}})();`,
+    );
+    pendingShortcutRoute = "";
+  } catch {
+    // Keep the route queued so the next loaded event can retry delivery.
+  }
+}
+
+function resolveRemoteStartUrl(): string {
+  if (!environmentResult.ok || !pendingShortcutRoute) {
+    return environmentResult.ok ? environmentResult.value.startUrl : "";
+  }
+  return `${environmentResult.value.startUrl}#${pendingShortcutRoute}`;
+}
+
+function consumeNativeShortcut(): void {
+  if (!nativeInitialized) return;
+  try {
+    const route = consumeShortcutRoute();
+    if (!route) return;
+    pendingShortcutRoute = route;
+    deliverPendingShortcut();
+  } catch {
+    // A malformed or unsupported shortcut is ignored by the native allowlist.
+  }
+}
+
+function initializeNativeIntegration(): void {
+  if (!environmentResult.ok) return;
+  try {
+    nativeInitialized = initializeNative(environmentResult.value.allowedOrigin);
+    if (nativeInitialized) consumeNativeShortcut();
+  } catch {
+    nativeInitialized = false;
+  }
+}
+
 function unmountRemoteWebview(): void {
+  stopNativeStatePolling();
+  lastNativeState = "";
   remoteWebview = null;
   backCheckWebview = null;
   webviewMounted.value = false;
@@ -99,7 +208,29 @@ function notifyRejectedNavigation(): void {
   });
 }
 
-function handleRejectedNavigation(): void {
+function handleNativeMediaNavigation(url: string): boolean {
+  if (!url.startsWith(NATIVE_MEDIA_URL_PREFIX) || url.length > MAX_NATIVE_MEDIA_URL_LENGTH) {
+    return false;
+  }
+  if (!nativeInitialized) {
+    uni.showToast({ title: "原生播放服务未就绪", icon: "none" });
+    return true;
+  }
+  try {
+    const command = decodeURIComponent(url.slice(NATIVE_MEDIA_URL_PREFIX.length));
+    const result = JSON.parse(dispatchNative(command)) as { ok?: boolean; error?: string };
+    if (!result.ok) {
+      uni.showToast({ title: result.error || "播放操作失败", icon: "none" });
+    }
+  } catch {
+    uni.showToast({ title: "播放操作失败", icon: "none" });
+  }
+  return true;
+}
+
+function handleRejectedNavigation(result: OverrideUrlResult): void {
+  const url = typeof result?.url === "string" ? result.url : "";
+  if (url && handleNativeMediaNavigation(url)) return;
   notifyRejectedNavigation();
 }
 
@@ -144,16 +275,22 @@ async function mountRemoteWebview(attempt: number): Promise<PlusWebviewWebviewOb
 function handleRemoteLoaded(webview: PlusWebviewWebviewObject): void {
   if (
     remoteWebview !== webview
-    || shellState.value !== "loading"
     || !environmentResult.ok
   ) return;
 
   const loadedUrl = parseHttpsUrl(webview.getURL());
   if (!loadedUrl || loadedUrl.origin !== environmentResult.value.allowedOrigin) return;
 
-  clearLoadTimeout();
-  shellState.value = "ready";
-  stateMessage.value = "";
+  if (shellState.value === "loading") {
+    clearLoadTimeout();
+    shellState.value = "ready";
+    stateMessage.value = "";
+  } else if (shellState.value !== "ready") {
+    return;
+  }
+  installRemoteNativeBridge(webview);
+  startNativeStatePolling();
+  deliverPendingShortcut();
 }
 
 function handleRemoteError(webview: PlusWebviewWebviewObject): void {
@@ -231,7 +368,7 @@ async function startShell(): Promise<void> {
       webview.stop();
       showFailure("error", "连接超时，请稍后重试。");
     }, LOAD_TIMEOUT_MS);
-    webview.loadURL(environmentResult.value.startUrl);
+    webview.loadURL(resolveRemoteStartUrl());
   } catch {
     showFailure("error", "WebView 初始化失败，请重新打开应用。");
   }
@@ -276,6 +413,8 @@ function handleBackPress(): void {
 }
 
 onReady(() => {
+  initializeNativeIntegration();
+  plus.globalEvent.addEventListener("newintent", consumeNativeShortcut);
   uni.onNetworkStatusChange(handleNetworkStatusChange);
   void startShell();
 });
@@ -288,6 +427,8 @@ onBackPress(() => {
 onUnload(() => {
   ++activeAttempt;
   clearLoadTimeout();
+  stopNativeStatePolling();
+  plus.globalEvent.removeEventListener("newintent", consumeNativeShortcut);
   uni.offNetworkStatusChange(handleNetworkStatusChange);
   unmountRemoteWebview();
 });

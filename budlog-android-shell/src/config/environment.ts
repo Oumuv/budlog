@@ -1,4 +1,4 @@
-export const BRIDGE_VERSION = "0";
+export const BRIDGE_VERSION = "1";
 
 export interface ShellEnvironment {
   allowedOrigin: string;

@@ -10,6 +10,22 @@ interface ImportMeta {
 
 declare const __BUDLOG_SHELL_VERSION__: string;
 
+interface PlusGlobalEvent {
+  addEventListener(event: "newintent", listener: () => void): void;
+  removeEventListener(event: "newintent", listener: () => void): void;
+}
+
+interface Plus {
+  readonly globalEvent: PlusGlobalEvent;
+}
+
+declare module "@/uni_modules/budlog-native" {
+  export function initializeNative(allowedOrigin: string): boolean;
+  export function dispatchNative(commandJson: string): string;
+  export function getNativeState(): string;
+  export function consumeShortcutRoute(): string;
+}
+
 declare module "*.vue" {
   import type { DefineComponent } from "vue";
 

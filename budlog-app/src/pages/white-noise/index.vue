@@ -47,6 +47,7 @@ const {
   playerError,
   sleepDeadline,
   sleepRemainingSeconds,
+  nativePlaybackSupported,
   currentTrack,
   canPrevious,
   canNext,
@@ -362,7 +363,10 @@ function formatBytes(value: number) {
             <NInputNumber v-model:value="customMinutes" :min="1" :max="720" :precision="0" button-placement="both" />
           </view>
           <NButton class="timer-confirm" type="primary" size="large" block @click="confirmTimer">确认设置</NButton>
-          <view class="timer-sheet__hint"><Info :size="14" /><text>锁屏或后台运行时，暂停时间可能受系统限制</text></view>
+          <view class="timer-sheet__hint">
+            <Info :size="14" />
+            <text>{{ nativePlaybackSupported ? "锁屏或后台运行时也会按时暂停" : "锁屏或后台运行时，暂停时间可能受系统限制" }}</text>
+          </view>
         </view>
       </view>
     </view>

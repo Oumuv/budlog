@@ -8,11 +8,16 @@ import BrandMark from "../../components/BrandMark.vue";
 import AppPage from "../../components/AppPage.vue";
 import { getPassword, setPassword } from "../../utils/auth";
 import { resetAccessVerification } from "../../utils/guard";
+import { consumePendingNativeShortcut } from "../../utils/nativeShortcuts";
 
 const password = ref("");
 const remember = ref(true);
 const loading = ref(false);
 const error = ref("");
+
+function enterApplication() {
+  uni.reLaunch({ url: consumePendingNativeShortcut() || "/pages/home/index" });
+}
 
 onLoad(async () => {
   const saved = getPassword();
@@ -24,7 +29,7 @@ onLoad(async () => {
   try {
     await verifyPassword("");
     resetAccessVerification();
-    uni.reLaunch({ url: "/pages/home/index" });
+    enterApplication();
   } catch {
     // Password-protected environments stay on the access page.
   }
@@ -38,7 +43,7 @@ async function submit() {
     await verifyPassword(password.value);
     setPassword(password.value, remember.value);
     resetAccessVerification();
-    uni.reLaunch({ url: "/pages/home/index" });
+    enterApplication();
   } catch (exception) {
     error.value = exception instanceof Error ? exception.message : "验证失败";
   } finally {

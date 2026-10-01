@@ -1,0 +1,30 @@
+{
+  "id": "budlog-native",
+  "displayName": "Budlog Android Native Integration",
+  "version": "1.0.0",
+  "description": "Budlog Android media playback and launcher shortcuts",
+  "keywords": [
+    "media",
+    "shortcuts"
+  ],
+  "engines": {
+    "HBuilderX": "^5.24.0"
+  },
+  "dcloudext": {
+    "type": "uts"
+  },
+  "uni_modules": {
+    "dependencies": [],
+    "encrypt": [],
+    "platforms": {
+      "client": {
+        "Vue": {
+          "vue3": "u"
+        },
+        "App": {
+          "app-android": "u"
+        }
+      }
+    }
+  }
+}

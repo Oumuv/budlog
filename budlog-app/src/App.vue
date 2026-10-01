@@ -1,20 +1,44 @@
 <script setup lang="ts">
 import { onHide, onLaunch, onShow } from "@dcloudio/uni-app";
 import { useWhiteNoisePlayerStore } from "./stores/whiteNoisePlayer";
+import { ensureAccess } from "./utils/guard";
+import {
+  consumePendingNativeShortcut,
+  peekPendingNativeShortcut,
+  queueNativeShortcut,
+} from "./utils/nativeShortcuts";
 import { initializePwa } from "./utils/pwa";
 import { checkForH5Update } from "./utils/release";
 import { startReminderLoop, stopReminderLoop } from "./utils/reminders";
 
 const whiteNoisePlayer = useWhiteNoisePlayerStore();
+let shortcutListenerBound = false;
+
+async function openPendingShortcut() {
+  if (!peekPendingNativeShortcut() || !(await ensureAccess())) return;
+  const route = consumePendingNativeShortcut();
+  if (route) uni.navigateTo({ url: route });
+}
+
+function handleNativeShortcut(event: Event) {
+  if (!(event instanceof CustomEvent) || !queueNativeShortcut(event.detail)) return;
+  event.preventDefault();
+  void openPendingShortcut();
+}
 
 onLaunch(() => {
   initializePwa();
   whiteNoisePlayer.initialize();
+  if (!shortcutListenerBound && typeof window !== "undefined") {
+    shortcutListenerBound = true;
+    window.addEventListener("budlog-native-shortcut", handleNativeShortcut);
+  }
 });
 onShow(() => {
   void checkForH5Update();
   startReminderLoop();
   whiteNoisePlayer.handleResume();
+  void openPendingShortcut();
 });
 onHide(() => stopReminderLoop());
 </script>
