@@ -1,3 +1,5 @@
+import { clearWhiteNoiseCaches } from "./whiteNoiseCache";
+
 const STORAGE_KEY = "budlog.access.password";
 
 let sessionPassword = "";
@@ -6,15 +8,18 @@ export function getPassword(): string {
   return sessionPassword || String(uni.getStorageSync(STORAGE_KEY) || "");
 }
 
-export function setPassword(password: string, remember: boolean): void {
+export async function setPassword(password: string, remember: boolean): Promise<void> {
+  const previous = getPassword();
+  if (previous && previous !== password) await clearWhiteNoiseCaches();
   sessionPassword = password;
   if (remember) uni.setStorageSync(STORAGE_KEY, password);
   else uni.removeStorageSync(STORAGE_KEY);
 }
 
-export function clearPassword(): void {
+export async function clearPassword(): Promise<void> {
   sessionPassword = "";
   uni.removeStorageSync(STORAGE_KEY);
+  await clearWhiteNoiseCaches();
 }
 
 export function redirectToAccess(): void {

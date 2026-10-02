@@ -7,6 +7,7 @@ import {
   Clock3,
   Info,
   Infinity as InfinityIcon,
+  LoaderCircle,
   Moon,
   Pause,
   Play,
@@ -39,6 +40,7 @@ const {
   selectedPlaylistId,
   currentTrackId,
   playing,
+  preparing,
   currentTime,
   duration,
   singleLoop,
@@ -181,9 +183,10 @@ function formatBytes(value: number) {
         </view>
         <view class="player-panel__body">
           <text class="player-panel__title">{{ currentTrack?.name || "选择一段白噪音" }}</text>
-          <view class="player-panel__status" :class="{ 'player-panel__status--active': playing }">
-            <AudioLines :size="15" />
-            <text>{{ playing ? "正在播放" : currentTrack ? "已暂停" : "等待播放" }}</text>
+          <view class="player-panel__status" :class="{ 'player-panel__status--active': playing || preparing }">
+            <LoaderCircle v-if="preparing" class="spin-icon" :size="15" />
+            <AudioLines v-else :size="15" />
+            <text>{{ preparing ? "正在缓存音频" : playing ? "正在播放" : currentTrack ? "已暂停" : "等待播放" }}</text>
           </view>
 
           <slider
@@ -218,7 +221,7 @@ function formatBytes(value: number) {
             </button>
             <button
               class="player-controls__primary"
-              :disabled="!currentTrack && !playlists.length"
+              :disabled="(preparing && !playing) || (!currentTrack && !playlists.length)"
               :aria-label="playing ? '暂停' : '播放'"
               :title="playing ? '暂停' : '播放'"
               @click="playing ? player.pausePlayback() : player.resumePlayback()"
@@ -304,6 +307,7 @@ function formatBytes(value: number) {
             :key="track.id"
             class="track-row"
             :class="{ 'track-row--active': track.id === currentTrackId }"
+            :disabled="preparing && !playing && track.id === currentTrackId"
             @click="player.toggleTrack(track.id)"
           >
             <view class="track-row__icon"><AudioLines :size="21" /></view>
@@ -312,7 +316,8 @@ function formatBytes(value: number) {
               <text class="track-row__meta">{{ track.format }} · {{ formatBytes(track.sizeBytes) }}</text>
             </view>
             <view class="track-row__action">
-              <AudioLines v-if="track.id === currentTrackId && playing" :size="18" />
+              <LoaderCircle v-if="track.id === currentTrackId && preparing" class="spin-icon" :size="18" />
+              <AudioLines v-else-if="track.id === currentTrackId && playing" :size="18" />
               <Play v-else :size="17" fill="currentColor" />
             </view>
           </button>

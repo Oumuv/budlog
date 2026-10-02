@@ -32,7 +32,7 @@ public final class BudlogNativeIntegration {
     private static final int MAX_COMMAND_LENGTH = 64 * 1024;
     private static final int MAX_QUEUE_SIZE = 100;
     private static final Set<String> SIMPLE_ACTIONS = new HashSet<>(Arrays.asList(
-            "resume", "pause", "previous", "next", "stop"
+            "resume", "pause", "previous", "next", "stop", "clearCache"
     ));
     private static final Set<String> SHORTCUT_ROUTES = new HashSet<>(Arrays.asList(
             "/pages/feeding/index?mode=timer",
@@ -137,11 +137,16 @@ public final class BudlogNativeIntegration {
             JSONObject item = queue.getJSONObject(i);
             String url = boundedString(item, "url", 2048);
             if (!isAllowedStreamUrl(origin, url)) throw new JSONException("Rejected native media URL.");
+            long sizeBytes = item.optLong("sizeBytes", 0L);
+            if (sizeBytes < 0L) {
+                throw new JSONException("Invalid native media size.");
+            }
             sanitizedQueue.put(new JSONObject()
                     .put("id", boundedString(item, "id", 128))
                     .put("title", boundedString(item, "title", 160))
                     .put("playlist", boundedString(item, "playlist", 160))
-                    .put("url", url));
+                    .put("url", url)
+                    .put("sizeBytes", sizeBytes));
         }
         int index = input.getInt("index");
         if (index < 0 || index >= sanitizedQueue.length()) throw new JSONException("Invalid queue index.");

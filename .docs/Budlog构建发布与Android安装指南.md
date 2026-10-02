@@ -4,7 +4,7 @@
 
 本文档用于交接 Budlog 的 H5、后端和 Android 薄壳构建发布流程。命令默认从 `<项目目录>` 执行，所有域名、账号、密码、证书路径和服务器地址均使用占位符。
 
-当前正式发布线为 `1.0.0`：
+当前 Android Shell 修复版本为 `1.0.4`（`versionCode 103`），`budlog-native` 模块版本为 `1.0.1`：
 
 - H5 继续是唯一业务页面实现，浏览器可直接访问。
 - Android App 是独立的 uni-app 薄壳，通过原生 `<web-view>` 加载固定 HTTPS H5。
@@ -59,14 +59,15 @@
 Android 版本由以下文件共同维护：
 
 - `budlog-android-shell/package.json`：`version`
-- `budlog-android-shell/package-lock.json`：根包 `version`
+- `budlog-android-shell/package-lock.json`：顶部及根包 `version`，应由 `npm version` 与 `package.json` 同步更新
 - `budlog-android-shell/src/manifest.json`：`versionName`、`versionCode`
+- `budlog-android-shell/src/uni_modules/budlog-native/package.json`：内部原生模块版本，仅在 UTS、AAR 或原生 Manifest 变化时递增
 
 `vite.config.ts` 会校验 `package.json` 与 `manifest.json` 的可见版本一致。建议规则：
 
-- `versionName` 使用语义版本，例如 `1.0.1`。
-- `versionCode` 只能递增，当前 `1.0.0` 对应 `10000`。
-- 可继续使用 `主版本 * 10000 + 次版本 * 100 + 修订号`，但一旦 APK 已分发，不得复用或降低 `versionCode`。
+- `versionName` 是用户可见的展示版本，例如 `1.0.4`；修复同一展示版本时可以保持不变。
+- `versionCode` 是 Android 判断升级先后的整数，只能递增；本次 `1.0.4` 修复包使用 `103`。
+- `package.json` 是 npm 项目元数据，`package-lock.json` 是安装依赖的锁定结果。正常改版本应同时更新两者，不能只改其中一个。
 
 更新 npm 版本时可执行：
 
@@ -75,7 +76,7 @@ cd <项目目录>/budlog-android-shell
 npm version <新versionName> --no-git-tag-version
 ```
 
-随后手工同步 `manifest.json` 的 `versionName` 和递增后的 `versionCode`。不要让 `npm version` 自动创建 Git tag。
+随后手工同步 `manifest.json` 的 `versionName` 和递增后的 `versionCode`。不要让 `npm version` 自动创建 Git tag。如果只是重打同一个 `versionName`，则手工同步 `package.json` 与 `package-lock.json`，并只递增 `versionCode`。
 
 ### 4.2 H5 版本
 
@@ -91,7 +92,7 @@ H5 在生产环境进入前台时最多每 5 分钟检查一次 `/version.json`�
 
 ### 4.3 Bridge 版本
 
-`budlog-android-shell/src/config/environment.ts` 中的 `BRIDGE_VERSION` 当前为 `0`，表示没有开放原生桥接。只有新增并稳定发布桥接协议时才递增；普通 H5 或 WebView 修复不修改它。
+`budlog-android-shell/src/config/environment.ts` 中的 `BRIDGE_VERSION` 当前为 `1`。只有新增并稳定发布桥接协议时才递增；普通 H5、WebView 修复或原生实现内部优化不修改它。
 
 ## 5. 配置与变量
 
@@ -440,6 +441,14 @@ adb devices
 
 云打包前还要确认 HBuilderX 已登录正确 DCloud 账号，AppID、包名、版本号与签名归属一致。
 
+如果本次修改了 `budlog-native`、AAR 或原生 Manifest，必须先执行以下额外步骤：
+
+1. 递增 `src/uni_modules/budlog-native/package.json` 的模块版本。
+2. 关闭正在进行的 HBuilderX 编译或打包任务。
+3. 删除项目生成的 `dist/cache/apk` 和 `dist/cache/uts_custom_android` 后重新构建。前者保存快速打包使用的原生基础 APK；不清理时，即使上传资源中已有新 AAR，也可能只替换 Web 资源并继续复用旧原生代码。
+4. 在 HBuilderX 日志中确认本次不再显示 `android fastmode: true`，或以最终 APK 的 DEX 检查结果为准。
+5. 安装前解压 APK 的 `classes*.dex`，确认本次新增的原生方法或唯一常量确实存在。仅检查源 AAR不足以证明 APK 已包含新实现。
+
 ### 10.4 使用 ADB 覆盖安装
 
 ```sh
@@ -462,8 +471,19 @@ adb shell monkey -p dev.oumuv.budlog -c android.intent.category.LAUNCHER 1
 6. 断网、加载失败、超时和“重新加载”状态可恢复。
 7. 设置页显示正确的 Android 壳版本和 H5 `buildId`。
 8. 原浏览器 H5 仍可正常使用。
+9. 原生音乐缓存改动需完成两轮播放：首次播放等待缓存完成，强制结束 App 后冷启动，再次播放应直接使用本地文件，且不应再次请求完整音频。
 
-## 11. 1.0.0 发布描述
+## 11. 发布描述
+
+### 11.1 Android Shell 1.0.1
+
+版本：Android Shell `1.0.1`（`versionCode 10001`），H5 保持 `1.0.0`。
+
+- 配置 Budlog 品牌 Android Launcher Icon，替换 HBuilder 默认图标。
+- 提供 `mdpi`、`hdpi`、`xhdpi`、`xxhdpi` 和 `xxxhdpi` 五档密度资源。
+- 不涉及 H5、后端、数据库或 WebView 行为变化。
+
+### 11.2 Android Shell 1.0.0 与 H5 1.0.0
 
 版本：Android Shell `1.0.0`（`versionCode 10000`），H5 `1.0.0` 发布线。
 

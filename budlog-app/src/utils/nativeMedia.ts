@@ -17,11 +17,12 @@ export interface NativeMediaQueueItem {
   title: string;
   playlist: string;
   url: string;
+  sizeBytes: number;
 }
 
 export type NativeMediaCommand =
   | { action: "play"; queue: NativeMediaQueueItem[]; index: number; loop: boolean }
-  | { action: "resume" | "pause" | "previous" | "next" | "stop" }
+  | { action: "resume" | "pause" | "previous" | "next" | "stop" | "clearCache" }
   | { action: "seek"; position: number }
   | { action: "setLoop"; loop: boolean }
   | { action: "setSleepTimer"; deadline: number | null };

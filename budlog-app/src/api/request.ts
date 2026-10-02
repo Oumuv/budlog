@@ -26,7 +26,7 @@ export function apiRequest<T>(path: string, options: RequestOptions = {}): Promi
       method: (options.method || "GET") as UniApp.RequestOptions["method"],
       data: options.data as UniApp.RequestOptions["data"],
       header: password ? { "X-App-Password": password } : {},
-      success: (response) => {
+      success: async (response) => {
         if (response.statusCode === 204) {
           resolve(undefined as T);
           return;
@@ -37,7 +37,7 @@ export function apiRequest<T>(path: string, options: RequestOptions = {}): Promi
           return;
         }
         if (response.statusCode === 401 && !options.skipAuthRedirect) {
-          clearPassword();
+          await clearPassword();
           redirectToAccess();
         }
         reject(new Error(payload?.message || `请求失败（${response.statusCode}）`));

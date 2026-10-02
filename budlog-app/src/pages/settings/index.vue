@@ -178,7 +178,7 @@ async function logout() {
   try {
     await api.logoutAccessSession();
     whiteNoisePlayer.disposePlayback();
-    clearPassword();
+    await clearPassword();
     resetAccessVerification();
     uni.reLaunch({ url: "/pages/access/index" });
   } catch (exception) {

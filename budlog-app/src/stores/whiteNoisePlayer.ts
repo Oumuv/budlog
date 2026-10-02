@@ -8,6 +8,7 @@ import {
   isNativeMediaState,
   type NativeMediaQueueItem,
 } from "../utils/nativeMedia";
+import { pruneWhiteNoiseCache, WHITE_NOISE_CACHE_CLEARED_EVENT } from "../utils/whiteNoiseCache";
 
 interface TrackContext {
   playlist: WhiteNoisePlaylist;
@@ -26,6 +27,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
   const selectedPlaylistId = ref("");
   const currentTrackId = ref("");
   const playing = ref(false);
+  const preparing = ref(false);
   const currentTime = ref(0);
   const duration = ref(0);
   const singleLoop = ref(true);
@@ -61,6 +63,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
     audio.loop = singleLoop.value;
     audio.addEventListener("play", () => {
       if (playbackBackend !== "web") return;
+      preparing.value = false;
       playing.value = true;
       playerError.value = "";
       updateMediaSessionState();
@@ -69,6 +72,15 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
       if (playbackBackend !== "web") return;
       playing.value = false;
       updateMediaSessionState();
+    });
+    audio.addEventListener("loadstart", () => {
+      if (playbackBackend === "web" && currentTrackId.value) preparing.value = true;
+    });
+    audio.addEventListener("waiting", () => {
+      if (playbackBackend === "web" && currentTrackId.value) preparing.value = true;
+    });
+    audio.addEventListener("canplay", () => {
+      if (playbackBackend === "web") preparing.value = false;
     });
     audio.addEventListener("loadedmetadata", syncAudioState);
     audio.addEventListener("durationchange", syncAudioState);
@@ -89,6 +101,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
     });
     audio.addEventListener("error", () => {
       if (!currentTrackId.value || playbackBackend !== "web") return;
+      preparing.value = false;
       playing.value = false;
       playerError.value = "音频加载失败，请重新扫描后再试";
       updateMediaSessionState();
@@ -100,6 +113,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
 
   function setPlaylists(next: WhiteNoisePlaylist[]) {
     playlists.value = next;
+    void pruneWhiteNoiseCache(next);
     if (!next.some((item) => item.id === selectedPlaylistId.value)) {
       selectedPlaylistId.value = next[0]?.id || "";
     }
@@ -117,6 +131,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
 
   async function toggleTrack(trackId: string) {
     if (trackId === currentTrackId.value) {
+      if (preparing.value && !playing.value) return;
       if (playing.value) pausePlayback();
       else await resumePlayback();
       return;
@@ -173,6 +188,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
         title: track.name,
         playlist: context.playlist.name,
         url: resolveNativeStreamUrl(track.streamUrl),
+        sizeBytes: track.sizeBytes,
       }));
       playbackBackend = "native";
       nativePlaybackSupported.value = true;
@@ -183,6 +199,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
       selectedPlaylistId.value = context.playlist.id;
       currentTime.value = 0;
       duration.value = 0;
+      preparing.value = true;
       playerError.value = "";
       if (!dispatchNativeMedia({
         action: "play",
@@ -191,13 +208,15 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
         loop: singleLoop.value,
       })) {
         playbackBackend = null;
+        preparing.value = false;
         playing.value = false;
         playerError.value = "原生播放服务暂时不可用";
         return;
       }
-      playing.value = true;
+      playing.value = false;
     } catch {
       playbackBackend = null;
+      preparing.value = false;
       playing.value = false;
       playerError.value = "音频地址无效，请重新扫描后再试";
     }
@@ -361,6 +380,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
       audio.removeAttribute("src");
       audio.load();
     }
+    preparing.value = false;
     currentTrackId.value = "";
     currentTime.value = 0;
     duration.value = 0;
@@ -408,6 +428,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
     document.addEventListener("visibilitychange", handleResume);
     window.addEventListener("pageshow", handleResume);
     window.addEventListener("focus", handleResume);
+    window.addEventListener(WHITE_NOISE_CACHE_CLEARED_EVENT, disposeCurrentTrack);
   }
 
   function bindNativeLifecycle() {
@@ -429,7 +450,8 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
     if (state.trackId) playbackBackend = "native";
     if (playbackBackend !== "native") return;
 
-    playing.value = state.status === "playing" || state.status === "loading";
+    preparing.value = state.status === "loading";
+    playing.value = state.status === "playing";
     currentTime.value = Math.max(0, state.currentTime);
     duration.value = Math.max(0, state.duration);
     singleLoop.value = state.loop;
@@ -557,6 +579,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
     selectedPlaylistId,
     currentTrackId,
     playing,
+    preparing,
     currentTime,
     duration,
     singleLoop,

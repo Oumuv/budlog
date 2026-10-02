@@ -41,7 +41,7 @@ async function submit() {
   error.value = "";
   try {
     await verifyPassword(password.value);
-    setPassword(password.value, remember.value);
+    await setPassword(password.value, remember.value);
     resetAccessVerification();
     enterApplication();
   } catch (exception) {

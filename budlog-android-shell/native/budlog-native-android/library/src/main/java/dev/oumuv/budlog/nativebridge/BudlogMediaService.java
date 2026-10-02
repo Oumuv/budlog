@@ -28,10 +28,28 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class BudlogMediaService extends Service {
     static final String ACTION_COMMAND = "dev.oumuv.budlog.nativebridge.COMMAND";
@@ -45,13 +63,18 @@ public final class BudlogMediaService extends Service {
     private static final String CHANNEL_ID = "budlog_white_noise";
     private static final int NOTIFICATION_ID = 4902;
     private static final long POSITION_UPDATE_INTERVAL_MS = 1_000L;
+    private static final long MAX_CACHE_BYTES = 512L * 1024L * 1024L;
+    private static final String CACHE_DIRECTORY = "white-noise-v1";
     private static final Object SNAPSHOT_LOCK = new Object();
+    private static final Object CACHE_MUTATION_LOCK = new Object();
+    private static final AtomicLong CACHE_EPOCH = new AtomicLong();
 
     private static volatile BudlogMediaService activeInstance;
     private static String lastSnapshot = "{\"status\":\"idle\",\"trackId\":\"\",\"currentTime\":0,\"duration\":0,\"loop\":true,\"sleepDeadline\":null,\"error\":\"\"}";
 
     private final List<Track> queue = new ArrayList<>();
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final ExecutorService cacheExecutor = Executors.newSingleThreadExecutor();
     private final Runnable positionTicker = new Runnable() {
         @Override
         public void run() {
@@ -105,6 +128,10 @@ public final class BudlogMediaService extends Service {
     private Long sleepDeadline;
     private String status = "idle";
     private String error = "";
+    private Future<?> cacheDownload;
+    private volatile HttpURLConnection activeCacheConnection;
+    private int prepareGeneration;
+    private File playerCacheFile;
 
     public static String snapshot() {
         BudlogMediaService service = activeInstance;
@@ -124,6 +151,7 @@ public final class BudlogMediaService extends Service {
         createMediaSession();
         createPlayer();
         registerNoisyReceiver();
+        cacheExecutor.execute(this::deletePartialCacheFiles);
         publishSnapshot();
     }
 
@@ -156,6 +184,8 @@ public final class BudlogMediaService extends Service {
     @Override
     public void onDestroy() {
         handler.removeCallbacks(positionTicker);
+        cancelCacheDownload();
+        cacheExecutor.shutdownNow();
         try {
             unregisterReceiver(noisyReceiver);
         } catch (IllegalArgumentException ignored) {
@@ -204,6 +234,8 @@ public final class BudlogMediaService extends Service {
                 updateSystemState();
             } else if ("stop".equals(action)) {
                 stopPlayback();
+            } else if ("clearCache".equals(action)) {
+                clearCache();
             }
         } catch (Exception exception) {
             setError("播放器命令处理失败");
@@ -219,7 +251,8 @@ public final class BudlogMediaService extends Service {
                     item.getString("id"),
                     item.getString("title"),
                     item.getString("playlist"),
-                    item.getString("url")
+                    item.getString("url"),
+                    item.optLong("sizeBytes", 0L)
             ));
         }
         int nextIndex = command.getInt("index");
@@ -252,8 +285,22 @@ public final class BudlogMediaService extends Service {
         });
         player.setOnCompletionListener(mediaPlayer -> handleCompletion());
         player.setOnErrorListener((mediaPlayer, what, extra) -> {
+            Track failedTrack = currentTrack();
+            File failedCache = playerCacheFile;
+            boolean retryPlayback = playWhenPrepared
+                    || "loading".equals(status)
+                    || "playing".equals(status);
             prepared = false;
             playWhenPrepared = false;
+            if (failedTrack != null && failedCache != null) {
+                synchronized (CACHE_MUTATION_LOCK) {
+                    failedCache.delete();
+                }
+                playerCacheFile = null;
+                resetPlayerForPreparation(retryPlayback);
+                prepareRemoteTrack(failedTrack, prepareGeneration);
+                return true;
+            }
             setError("音频加载失败，请重新扫描后再试");
             return true;
         });
@@ -265,28 +312,273 @@ public final class BudlogMediaService extends Service {
             stopPlayback();
             return;
         }
+        cancelCacheDownload();
+        final int generation = ++prepareGeneration;
         try {
+            resetPlayerForPreparation(autoPlay);
+            File cached = validCacheFile(track);
+            if (cached != null) {
+                cached.setLastModified(System.currentTimeMillis());
+                prepareCachedTrack(track, cached, generation);
+                cacheExecutor.execute(() -> pruneCache(cached));
+                return;
+            }
+            if (isCacheable(track)) {
+                downloadAndPrepare(track, generation);
+                return;
+            }
+            prepareRemoteTrack(track, generation);
+        } catch (Exception exception) {
             prepared = false;
-            playWhenPrepared = autoPlay;
-            status = "loading";
-            error = "";
-            player.reset();
-            player.setAudioAttributes(new AudioAttributes.Builder()
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .build());
+            playWhenPrepared = false;
+            setError("音频加载失败，请重新扫描后再试");
+        }
+    }
+
+    private void resetPlayerForPreparation(boolean autoPlay) {
+        prepared = false;
+        playWhenPrepared = autoPlay;
+        status = "loading";
+        error = "";
+        playerCacheFile = null;
+        player.reset();
+        player.setAudioAttributes(new AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .build());
+        updateMetadata();
+        updateSystemState();
+        scheduleTicker();
+    }
+
+    private void prepareCachedTrack(Track track, File cached, int generation) {
+        if (!isCurrentPreparation(track, generation)) return;
+        try {
+            playerCacheFile = cached;
+            player.setDataSource(cached.getAbsolutePath());
+            player.prepareAsync();
+        } catch (Exception exception) {
+            synchronized (CACHE_MUTATION_LOCK) {
+                cached.delete();
+            }
+            playerCacheFile = null;
+            resetPlayerForPreparation(playWhenPrepared);
+            prepareRemoteTrack(track, generation);
+        }
+    }
+
+    private void prepareRemoteTrack(Track track, int generation) {
+        if (!isCurrentPreparation(track, generation)) return;
+        try {
+            playerCacheFile = null;
             Map<String, String> headers = new HashMap<>();
             String cookies = CookieManager.getInstance().getCookie(track.url);
             if (cookies != null && cookies.length() > 0) headers.put("Cookie", cookies);
             player.setDataSource(this, Uri.parse(track.url), headers);
             player.prepareAsync();
-            updateMetadata();
-            updateSystemState();
-            scheduleTicker();
         } catch (Exception exception) {
             prepared = false;
             playWhenPrepared = false;
             setError("音频加载失败，请重新扫描后再试");
+        }
+    }
+
+    private void downloadAndPrepare(Track track, int generation) {
+        String cookies = CookieManager.getInstance().getCookie(track.url);
+        long downloadEpoch = CACHE_EPOCH.get();
+        cacheDownload = cacheExecutor.submit(() -> {
+            File downloaded = null;
+            try {
+                downloaded = downloadTrack(track, cookies, downloadEpoch);
+                if (downloaded != null) pruneCache(downloaded);
+            } catch (IOException ignored) {
+                // Remote playback remains available when the cache cannot be populated.
+            }
+            File result = downloaded;
+            handler.post(() -> {
+                if (!isCurrentPreparation(track, generation)) return;
+                cacheDownload = null;
+                if (result != null && result.isFile() && result.length() == track.sizeBytes) {
+                    prepareCachedTrack(track, result, generation);
+                } else {
+                    prepareRemoteTrack(track, generation);
+                }
+            });
+        });
+    }
+
+    private boolean isCurrentPreparation(Track track, int generation) {
+        return generation == prepareGeneration && currentTrack() == track && player != null;
+    }
+
+    private boolean isCacheable(Track track) {
+        return track.sizeBytes > 0L && track.sizeBytes <= MAX_CACHE_BYTES;
+    }
+
+    private File validCacheFile(Track track) {
+        if (!isCacheable(track)) return null;
+        File target = cacheFile(track);
+        if (target == null || !target.isFile()) return null;
+        if (target.length() == track.sizeBytes) return target;
+        target.delete();
+        return null;
+    }
+
+    private File downloadTrack(Track track, String cookies, long downloadEpoch) throws IOException {
+        File target = cacheFile(track);
+        if (target == null) throw new IOException("Audio cache is unavailable.");
+        File existing = validCacheFile(track);
+        if (existing != null) return existing;
+
+        File directory = target.getParentFile();
+        File partial = File.createTempFile(target.getName(), ".part", directory);
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(track.url).openConnection();
+            activeCacheConnection = connection;
+            connection.setInstanceFollowRedirects(false);
+            connection.setConnectTimeout(10_000);
+            connection.setReadTimeout(60_000);
+            connection.setRequestProperty("Accept", "audio/mpeg");
+            connection.setRequestProperty("Accept-Encoding", "identity");
+            if (cookies != null && cookies.length() > 0) connection.setRequestProperty("Cookie", cookies);
+            connection.connect();
+
+            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                throw new IOException("Unexpected audio response status.");
+            }
+            String contentType = connection.getContentType();
+            if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("audio/")) {
+                throw new IOException("Unexpected audio content type.");
+            }
+            long declaredLength = parseContentLength(connection.getHeaderField("Content-Length"));
+            if (declaredLength >= 0L && declaredLength != track.sizeBytes) {
+                throw new IOException("Audio size changed before download.");
+            }
+
+            long total = 0L;
+            byte[] buffer = new byte[64 * 1024];
+            try (InputStream input = new BufferedInputStream(connection.getInputStream());
+                 FileOutputStream fileOutput = new FileOutputStream(partial);
+                 BufferedOutputStream output = new BufferedOutputStream(fileOutput)) {
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new InterruptedIOException("Audio cache download cancelled.");
+                    }
+                    total += read;
+                    if (total > track.sizeBytes) throw new IOException("Audio download exceeded expected size.");
+                    output.write(buffer, 0, read);
+                }
+                output.flush();
+                fileOutput.getFD().sync();
+            }
+            if (total != track.sizeBytes) throw new IOException("Audio download was incomplete.");
+            if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedIOException("Audio cache download cancelled.");
+            }
+
+            synchronized (CACHE_MUTATION_LOCK) {
+                if (Thread.currentThread().isInterrupted() || CACHE_EPOCH.get() != downloadEpoch) {
+                    throw new InterruptedIOException("Audio cache download cancelled.");
+                }
+                if (target.exists() && !target.delete()) {
+                    throw new IOException("Stale audio cache could not be replaced.");
+                }
+                if (!partial.renameTo(target)) throw new IOException("Audio cache could not be finalized.");
+            }
+            target.setLastModified(System.currentTimeMillis());
+            return target;
+        } finally {
+            if (activeCacheConnection == connection) activeCacheConnection = null;
+            if (connection != null) connection.disconnect();
+            if (partial.exists()) partial.delete();
+        }
+    }
+
+    private long parseContentLength(String value) throws IOException {
+        if (value == null || value.trim().length() == 0) return -1L;
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException exception) {
+            throw new IOException("Invalid audio content length.", exception);
+        }
+    }
+
+    private File cacheFile(Track track) {
+        File directory = cacheDirectory();
+        if (directory == null) return null;
+        return new File(directory, sha256(track.id + "\n" + track.url) + ".mp3");
+    }
+
+    private File cacheDirectory() {
+        File directory = new File(getCacheDir(), CACHE_DIRECTORY);
+        if ((!directory.exists() && !directory.mkdirs()) || !directory.isDirectory()) return null;
+        return directory;
+    }
+
+    private String sha256(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder result = new StringBuilder(digest.length * 2);
+            for (byte item : digest) result.append(String.format(Locale.ROOT, "%02x", item & 0xff));
+            return result.toString();
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable.", exception);
+        }
+    }
+
+    private void pruneCache(File keep) {
+        File directory = cacheDirectory();
+        if (directory == null) return;
+        File[] files = directory.listFiles((parent, name) -> name.endsWith(".mp3"));
+        if (files == null) return;
+        long total = 0L;
+        for (File file : files) total += Math.max(0L, file.length());
+        if (total <= MAX_CACHE_BYTES) return;
+
+        Arrays.sort(files, (left, right) -> Long.compare(left.lastModified(), right.lastModified()));
+        for (File file : files) {
+            if (total <= MAX_CACHE_BYTES) break;
+            if (keep != null && keep.equals(file)) continue;
+            long length = Math.max(0L, file.length());
+            if (file.delete()) total -= length;
+        }
+    }
+
+    private void deletePartialCacheFiles() {
+        File directory = cacheDirectory();
+        if (directory == null) return;
+        File[] files = directory.listFiles((parent, name) -> name.endsWith(".part"));
+        if (files == null) return;
+        for (File file : files) file.delete();
+    }
+
+    private void clearCacheFiles() {
+        File directory = cacheDirectory();
+        if (directory == null) return;
+        File[] files = directory.listFiles();
+        if (files == null) return;
+        for (File file : files) {
+            if (file.isFile()) file.delete();
+        }
+    }
+
+    private void cancelCacheDownload() {
+        HttpURLConnection connection = activeCacheConnection;
+        activeCacheConnection = null;
+        if (connection != null) connection.disconnect();
+        Future<?> download = cacheDownload;
+        cacheDownload = null;
+        if (download != null) download.cancel(true);
+    }
+
+    private void clearCache() {
+        CACHE_EPOCH.incrementAndGet();
+        stopPlayback();
+        synchronized (CACHE_MUTATION_LOCK) {
+            clearCacheFiles();
         }
     }
 
@@ -301,7 +593,7 @@ public final class BudlogMediaService extends Service {
         }
         if (!prepared) {
             playWhenPrepared = true;
-            if (!"loading".equals(status)) prepareCurrent(true);
+            if (cacheDownload == null && !"loading".equals(status)) prepareCurrent(true);
             return;
         }
         startPreparedPlayer();
@@ -384,10 +676,13 @@ public final class BudlogMediaService extends Service {
 
     private void stopPlayback() {
         handler.removeCallbacks(positionTicker);
+        prepareGeneration++;
+        cancelCacheDownload();
         sleepDeadline = null;
         resumeOnFocusGain = false;
         playWhenPrepared = false;
         prepared = false;
+        playerCacheFile = null;
         abandonAudioFocus();
         if (player != null) {
             try {
@@ -695,12 +990,14 @@ public final class BudlogMediaService extends Service {
         private final String title;
         private final String playlist;
         private final String url;
+        private final long sizeBytes;
 
-        private Track(String id, String title, String playlist, String url) {
+        private Track(String id, String title, String playlist, String url, long sizeBytes) {
             this.id = id;
             this.title = title;
             this.playlist = playlist;
             this.url = url;
+            this.sizeBytes = sizeBytes;
         }
     }
 }

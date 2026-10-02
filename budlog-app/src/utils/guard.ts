@@ -23,7 +23,7 @@ export async function ensureAccess(): Promise<boolean> {
     verifiedPassword = password;
     return true;
   } catch {
-    clearPassword();
+    await clearPassword();
     verifiedPassword = "";
     redirectToAccess();
     return false;
