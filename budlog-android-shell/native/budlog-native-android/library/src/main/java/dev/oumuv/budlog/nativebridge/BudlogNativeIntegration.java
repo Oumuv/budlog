@@ -37,6 +37,7 @@ public final class BudlogNativeIntegration {
     private static final Set<String> SHORTCUT_ROUTES = new HashSet<>(Arrays.asList(
             "/pages/feeding/index?mode=timer",
             "/pages/feeding/index?mode=bottle",
+            "/pages/milk-storage/index",
             "/pages/diaper/index",
             "/pages/white-noise/index"
     ));
@@ -211,9 +212,11 @@ public final class BudlogNativeIntegration {
                 drawableResource(activity, "ic_shortcut_timer", android.R.drawable.ic_menu_recent_history)));
         shortcuts.add(shortcut(activity, "feeding_bottle", "记录瓶喂", "/pages/feeding/index?mode=bottle", 1,
                 drawableResource(activity, "ic_shortcut_bottle", android.R.drawable.ic_input_add)));
-        shortcuts.add(shortcut(activity, "diaper", "记录尿便", "/pages/diaper/index", 2,
+        shortcuts.add(shortcut(activity, "milk_storage", "记录存奶", "/pages/milk-storage/index", 2,
+                drawableResource(activity, "ic_shortcut_milk_storage", android.R.drawable.ic_input_add)));
+        shortcuts.add(shortcut(activity, "diaper", "记录尿便", "/pages/diaper/index", 3,
                 drawableResource(activity, "ic_shortcut_diaper", android.R.drawable.ic_menu_edit)));
-        shortcuts.add(shortcut(activity, "white_noise", "播放白噪音", "/pages/white-noise/index", 3,
+        shortcuts.add(shortcut(activity, "white_noise", "播放白噪音", "/pages/white-noise/index", 4,
                 drawableResource(activity, "ic_shortcut_white_noise", android.R.drawable.ic_media_play)));
         int shortcutCount = Math.min(shortcuts.size(), manager.getMaxShortcutCountPerActivity());
         if (shortcutCount == 0) return;

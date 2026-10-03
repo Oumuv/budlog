@@ -1,6 +1,7 @@
 const ALLOWED_SHORTCUT_ROUTES = new Set([
   "/pages/feeding/index?mode=timer",
   "/pages/feeding/index?mode=bottle",
+  "/pages/milk-storage/index",
   "/pages/diaper/index",
   "/pages/white-noise/index",
 ]);
