@@ -1,11 +1,12 @@
 {
   "id": "budlog-native",
   "displayName": "Budlog Android Native Integration",
-  "version": "1.0.2",
-  "description": "Budlog Android media playback and launcher shortcuts",
+  "version": "1.1.4",
+  "description": "Budlog Android media playback, launcher shortcuts, and home screen widget",
   "keywords": [
     "media",
-    "shortcuts"
+    "shortcuts",
+    "widget"
   ],
   "engines": {
     "HBuilderX": "^5.24.0"

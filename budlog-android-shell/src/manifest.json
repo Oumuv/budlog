@@ -2,8 +2,8 @@
     "name" : "Budlog",
     "appid" : "__UNI__A5107DE",
     "description" : "Budlog Android H5 shell",
-    "versionName" : "1.0.5",
-    "versionCode" : 104,
+    "versionName" : "1.1.1",
+    "versionCode" : 108,
     "transformPx" : false,
     "app-plus" : {
         "usingComponents" : true,

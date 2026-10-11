@@ -8,8 +8,14 @@ interface BudlogNativeMediaBridge {
   dispatch(payload: string): void;
 }
 
+interface BudlogNativeWidgetBridge {
+  readonly version: string;
+  dispatch(payload: string): void;
+}
+
 interface Window {
   readonly BudlogNativeMedia?: BudlogNativeMediaBridge;
+  readonly BudlogNativeWidget?: BudlogNativeWidgetBridge;
 }
 
 declare module '*.vue' {

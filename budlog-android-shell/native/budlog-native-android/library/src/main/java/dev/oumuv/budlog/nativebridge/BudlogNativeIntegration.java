@@ -2,6 +2,8 @@ package dev.oumuv.budlog.nativebridge;
 
 import android.Manifest;
 import android.app.Activity;
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -30,15 +32,20 @@ public final class BudlogNativeIntegration {
 
     private static final int NOTIFICATION_PERMISSION_REQUEST = 9401;
     private static final int MAX_COMMAND_LENGTH = 64 * 1024;
+    private static final int MAX_WIDGET_COMMAND_LENGTH = 4 * 1024;
     private static final int MAX_QUEUE_SIZE = 100;
     private static final Set<String> SIMPLE_ACTIONS = new HashSet<>(Arrays.asList(
             "resume", "pause", "previous", "next", "stop", "clearCache"
     ));
     private static final Set<String> SHORTCUT_ROUTES = new HashSet<>(Arrays.asList(
+            "/pages/home/index",
+            "/pages/records/index",
+            "/pages/settings/index",
             "/pages/feeding/index?mode=timer",
             "/pages/feeding/index?mode=bottle",
             "/pages/milk-storage/index",
             "/pages/diaper/index",
+            "/pages/task-edit/index",
             "/pages/white-noise/index"
     ));
 
@@ -56,6 +63,8 @@ public final class BudlogNativeIntegration {
                 .apply();
         installShortcuts(activity);
         BudlogMediaService.ensureNotificationChannel(activity);
+        BudlogWidgetRenderer.updateAll(activity);
+        BudlogWidgetRefreshJobService.schedulePeriodicIfNeeded(activity);
         requestNotificationPermission(activity);
         return true;
     }
@@ -89,6 +98,59 @@ public final class BudlogNativeIntegration {
         return BudlogMediaService.snapshot();
     }
 
+    public static String dispatchWidget(Activity activity, String commandJson) {
+        if (activity == null) return widgetError("Native activity is unavailable.");
+        if (commandJson == null || commandJson.length() == 0 || commandJson.length() > MAX_WIDGET_COMMAND_LENGTH) {
+            return widgetError("Invalid native widget command size.");
+        }
+
+        try {
+            JSONObject input = new JSONObject(commandJson);
+            String action = boundedString(input, "action", 32);
+            BudlogWidgetRepository repository = new BudlogWidgetRepository(activity);
+            if ("refresh".equals(action)) {
+                repository.markAuthRestored();
+                boolean scheduled = BudlogWidgetRefreshJobService.scheduleImmediate(activity);
+                BudlogWidgetRenderer.updateAll(activity);
+                return widgetResult(true, scheduled, scheduled ? null : "请先把 Budlog 组件添加到桌面");
+            }
+            if ("syncTimer".equals(action)) {
+                JSONObject timer = input.getJSONObject("timer");
+                String startTime = boundedString(timer, "startTime", 64);
+                long startTimeMillis = BudlogWidgetRepository.parseIsoMillis(startTime);
+                long now = System.currentTimeMillis();
+                if (startTimeMillis < now - 24L * 60L * 60L * 1000L
+                        || startTimeMillis > now + 5L * 60L * 1000L) {
+                    throw new JSONException("Invalid widget timer start time.");
+                }
+                String breastSide = boundedString(timer, "breastSide", 8);
+                if (!"LEFT".equals(breastSide) && !"RIGHT".equals(breastSide) && !"BOTH".equals(breastSide)) {
+                    throw new JSONException("Invalid widget timer breast side.");
+                }
+                repository.syncTimer(startTimeMillis, breastSide);
+                BudlogWidgetRenderer.updateAll(activity);
+                return widgetResult(true, true, null);
+            }
+            if ("clearTimer".equals(action)) {
+                repository.clearTimer();
+                BudlogWidgetRenderer.updateAll(activity);
+                return widgetResult(true, true, null);
+            }
+            if ("clearWidgetData".equals(action)) {
+                repository.clearAll();
+                repository.markAuthRequired();
+                BudlogWidgetRenderer.updateAll(activity);
+                return widgetResult(true, true, null);
+            }
+            if ("requestPin".equals(action)) {
+                return requestPinWidget(activity);
+            }
+            throw new JSONException("Unsupported native widget action.");
+        } catch (Exception exception) {
+            return widgetError(exception.getMessage() == null ? "Invalid native widget command." : exception.getMessage());
+        }
+    }
+
     public static String consumeShortcutRoute(Activity activity) {
         if (activity == null) return "";
         Intent intent = activity.getIntent();
@@ -105,7 +167,7 @@ public final class BudlogNativeIntegration {
 
         if ("seek".equals(action)) {
             double position = input.getDouble("position");
-            if (!Double.isFinite(position) || position < 0 || position > 24 * 60 * 60) {
+            if (Double.isNaN(position) || Double.isInfinite(position) || position < 0 || position > 24 * 60 * 60) {
                 throw new JSONException("Invalid seek position.");
             }
             return output.put("position", position);
@@ -163,6 +225,38 @@ public final class BudlogNativeIntegration {
             throw new JSONException("Invalid " + key + ".");
         }
         return value;
+    }
+
+    private static String requestPinWidget(Activity activity) throws JSONException {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return widgetResult(true, false, "请长按桌面空白处，从组件列表添加 Budlog");
+        }
+        AppWidgetManager manager = AppWidgetManager.getInstance(activity);
+        if (!manager.isRequestPinAppWidgetSupported()) {
+            return widgetResult(true, false, "当前桌面不支持自动添加，请从组件列表选择 Budlog");
+        }
+        boolean requested = manager.requestPinAppWidget(
+                new ComponentName(activity, BudlogWidgetProvider.class),
+                null,
+                null);
+        return widgetResult(
+                true,
+                requested,
+                requested ? "请在系统窗口中确认添加" : "未能打开添加窗口，请从组件列表手动添加");
+    }
+
+    private static String widgetResult(boolean ok, boolean supported, String message) throws JSONException {
+        JSONObject result = new JSONObject().put("ok", ok).put("supported", supported);
+        if (message != null) result.put("message", message);
+        return result.toString();
+    }
+
+    private static String widgetError(String message) {
+        try {
+            return new JSONObject().put("ok", false).put("error", message).toString();
+        } catch (JSONException ignored) {
+            return "{\"ok\":false,\"error\":\"Native widget command failed.\"}";
+        }
     }
 
     private static boolean isAllowedStreamUrl(String origin, String value) {

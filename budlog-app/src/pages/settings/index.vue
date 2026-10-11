@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CalendarDays, Check, ChevronRight, Download, Info, LogOut, MonitorSmartphone, Pencil, Plus, Save, Smartphone, Trash2, X } from "lucide-vue-next";
+import { CalendarDays, Check, ChevronRight, Download, Info, LogOut, MonitorSmartphone, PanelsTopLeft, Pencil, Plus, Save, Smartphone, Trash2, X } from "lucide-vue-next";
 import { NButton, NInput, NInputNumber, NSwitch } from "naive-ui";
 import { onShow } from "@dcloudio/uni-app";
 import { reactive, ref } from "vue";
@@ -17,6 +17,7 @@ import { ensureAccess, resetAccessVerification } from "../../utils/guard";
 import { pwaInstallAvailable, pwaStandalone, requestPwaInstall } from "../../utils/pwa";
 import { currentRelease } from "../../utils/release";
 import { runtime } from "../../utils/runtime";
+import { isNativeWidgetAvailable, requestPinNativeWidget } from "../../utils/nativeWidget";
 
 const SHANGHAI_TIMEZONE = "Asia/Shanghai";
 const whiteNoisePlayer = useWhiteNoisePlayerStore();
@@ -25,6 +26,7 @@ const loggingOut = ref(false);
 const savingProfile = ref(false);
 const savingSettings = ref(false);
 const error = ref("");
+const widgetAvailable = ref(isNativeWidgetAvailable());
 const configured = ref(false);
 const profileEditing = ref(false);
 const milestones = ref<Milestone[]>([]);
@@ -46,6 +48,7 @@ const intervalPresets = [
 ];
 
 onShow(async () => {
+  widgetAvailable.value = isNativeWidgetAvailable();
   if (await ensureAccess()) await load();
 });
 
@@ -228,6 +231,16 @@ async function installPwa() {
     uni.showToast({ title: "暂时无法唤起安装，请通过浏览器菜单添加", icon: "none" });
   }
 }
+
+function addDesktopWidget() {
+  widgetAvailable.value = isNativeWidgetAvailable();
+  if (widgetAvailable.value && requestPinNativeWidget()) return;
+  uni.showModal({
+    title: "桌面组件不可用",
+    content: "当前 Android 安装包不支持此功能，请升级 Budlog 后再试。",
+    showCancel: false,
+  });
+}
 </script>
 
 <template>
@@ -324,6 +337,11 @@ async function installPwa() {
               <view class="utility-row__icon"><Smartphone :size="19" /></view>
               <view><text>Android 壳</text><small>Shell {{ runtime.shellVersion || "未知" }} · Bridge {{ runtime.bridgeVersion || "未知" }}</small></view>
             </view>
+            <button v-if="runtime.isAndroidApp" class="utility-row" @click="addDesktopWidget">
+              <view class="utility-row__icon utility-row__icon--widget"><PanelsTopLeft :size="19" /></view>
+              <view><text>桌面组件</text><small>{{ widgetAvailable ? "添加 Budlog 今日照护到桌面" : "当前安装包暂不支持" }}</small></view>
+              <ChevronRight :size="17" />
+            </button>
             <button v-if="!runtime.isAndroidApp" class="utility-row" @click="installPwa">
               <view class="utility-row__icon"><MonitorSmartphone :size="19" /></view>
               <view><text>桌面应用</text><small>{{ pwaStandalone ? "已安装" : pwaInstallAvailable ? "可以安装" : "添加到主屏幕" }}</small></view>
@@ -404,6 +422,7 @@ async function installPwa() {
 .utility-row text { font-size: 11px; font-weight: 750; }
 .utility-row small { margin-top: 2px; overflow-wrap: anywhere; color: var(--bud-color-muted); font-size: 9px; }
 .utility-row__state { display: flex; align-items: center; gap: 3px; color: var(--baby-green); font-size: 9px; }
+.utility-row__icon--widget { color: var(--baby-green); background: var(--baby-green-soft); }
 .utility-row--static { background: var(--bud-color-surface); }
 .utility-row--logout .utility-row__icon { color: var(--bud-color-primary); background: var(--bud-color-primary-soft); }
 .modal-backdrop { position: fixed; z-index: 50; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 15px; background: rgba(31, 37, 53, 0.48); backdrop-filter: blur(3px); }

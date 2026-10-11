@@ -2,6 +2,7 @@ import { BudlogNativeIntegration } from "dev.oumuv.budlog.nativebridge"
 import {
   ConsumeShortcutRoute,
   DispatchNative,
+  DispatchNativeWidget,
   GetNativeState,
   InitializeNative,
 } from "../interface.uts"
@@ -16,6 +17,12 @@ export const dispatchNative: DispatchNative = function (commandJson: string): st
   const context = UTSAndroid.getAppContext()
   if (context == null) return "{\"ok\":false,\"error\":\"Native context is unavailable.\"}"
   return BudlogNativeIntegration.dispatch(context, commandJson)
+}
+
+export const dispatchNativeWidget: DispatchNativeWidget = function (commandJson: string): string {
+  const activity = UTSAndroid.getUniActivity()
+  if (activity == null) return "{\"ok\":false,\"error\":\"Native activity is unavailable.\"}"
+  return BudlogNativeIntegration.dispatchWidget(activity, commandJson)
 }
 
 export const getNativeState: GetNativeState = function (): string {

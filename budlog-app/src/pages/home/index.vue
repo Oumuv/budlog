@@ -26,6 +26,7 @@ import type { Dashboard, TodoTask } from "../../types";
 import { formatDate, formatDateTime, formatDuration, setAppTimezone, toLocalInput } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
 import { clearShownReminder } from "../../utils/reminders";
+import { requestNativeWidgetRefresh } from "../../utils/nativeWidget";
 
 const dashboard = ref<Dashboard>();
 const loading = ref(true);
@@ -74,6 +75,7 @@ async function load() {
   try {
     dashboard.value = await api.dashboard();
     if (dashboard.value.baby) setAppTimezone(dashboard.value.baby.timezone);
+    requestNativeWidgetRefresh();
     await refreshDueReminders();
   } catch (exception) {
     error.value = exception instanceof Error ? exception.message : "首页加载失败";

@@ -39,7 +39,8 @@ public class AccessPasswordFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         if (passwordService.matches(request.getHeader(AccessPasswordService.HEADER_NAME))
-                || isAuthorizedMediaRequest(request)) {
+                || isAuthorizedMediaRequest(request)
+                || isAuthorizedWidgetRequest(request)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -60,6 +61,22 @@ public class AccessPasswordFilter extends OncePerRequestFilter {
         for (javax.servlet.http.Cookie cookie : request.getCookies()) {
             if (AccessPasswordService.MEDIA_COOKIE_NAME.equals(cookie.getName())) {
                 return passwordService.matchesMediaSession(cookie.getValue());
+            }
+        }
+        return false;
+    }
+
+    private boolean isAuthorizedWidgetRequest(HttpServletRequest request) {
+        if (!HttpMethod.GET.matches(request.getMethod())
+                || !"/api/v1/widget/summary".equals(request.getRequestURI())) {
+            return false;
+        }
+        if (request.getCookies() == null) {
+            return false;
+        }
+        for (javax.servlet.http.Cookie cookie : request.getCookies()) {
+            if (AccessPasswordService.WIDGET_COOKIE_NAME.equals(cookie.getName())) {
+                return passwordService.matchesWidgetSession(cookie.getValue());
             }
         }
         return false;

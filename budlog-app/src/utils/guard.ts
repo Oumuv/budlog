@@ -30,6 +30,11 @@ export async function ensureAccess(): Promise<boolean> {
   }
 }
 
+export function markAccessVerified(password: string): void {
+  verifiedPassword = password;
+  passwordlessAccessVerified = !password;
+}
+
 export function resetAccessVerification(): void {
   verifiedPassword = "";
   passwordlessAccessVerified = false;

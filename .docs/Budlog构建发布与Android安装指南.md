@@ -4,13 +4,14 @@
 
 本文档用于交接 Budlog 的 H5、后端和 Android 薄壳构建发布流程。命令默认从 `<项目目录>` 执行，所有域名、账号、密码、证书路径和服务器地址均使用占位符。
 
-当前 Android Shell 修复版本为 `1.0.4`（`versionCode 103`），`budlog-native` 模块版本为 `1.0.1`：
+当前 Android Shell 源码版本为 `1.1.1`（`versionCode 108`），`budlog-native` 模块版本为 `1.1.4`，壳层总 Bridge 版本为 `2`：
 
 - H5 继续是唯一业务页面实现，浏览器可直接访问。
 - Android App 是独立的 uni-app 薄壳，通过原生 `<web-view>` 加载固定 HTTPS H5。
 - 普通 H5 页面、样式和业务逻辑更新不需要重新安装 APK。
 - Android 壳层、安全域名、原生权限、Manifest 或桥接能力变化必须重新发布 APK。
 - H5 使用同源 `/api/v1`，没有需要写入 App 的后端 API 地址变量。
+- Android 桌面组件由原生 Provider 提供；摘要接口和 H5 Widget Bridge 必须与新 APK 按兼容顺序发布。
 
 ## 2. 先判断需要发布什么
 
@@ -22,6 +23,7 @@
 | Flyway migration | 视情况 | 是 | 否 | 发布前必须备份目标数据库 |
 | Nginx 缓存、反向代理或部署脚本 | 视情况 | 视情况 | 否 | 需要更新服务器部署文件并重建相关容器 |
 | Android 壳页面、WebView、返回键、权限、包名 | 否 | 否 | 是 | 已安装用户必须升级 APK |
+| Android Widget Provider、布局、AAR、Manifest 或 Widget Bridge | 是 | 视情况 | 是 | 先发布兼容后端，再发布 APK，最后启用 H5 入口 |
 | `VITE_BUDLOG_H5_URL` 或允许的 H5 origin | 否 | 否 | 是 | 地址编译进壳层，不能通过 H5 热更新 |
 | H5 与 Android 壳同时依赖的新能力 | 是 | 视情况 | 是 | 先发兼容 APK，再发启用能力的 H5 |
 
@@ -65,8 +67,8 @@ Android 版本由以下文件共同维护：
 
 `vite.config.ts` 会校验 `package.json` 与 `manifest.json` 的可见版本一致。建议规则：
 
-- `versionName` 是用户可见的展示版本，例如 `1.0.4`；修复同一展示版本时可以保持不变。
-- `versionCode` 是 Android 判断升级先后的整数，只能递增；本次 `1.0.4` 修复包使用 `103`。
+- `versionName` 是用户可见的展示版本，例如 `1.1.1`；修复同一展示版本时可以保持不变。
+- `versionCode` 是 Android 判断升级先后的整数，只能递增；当前源码使用 `108`，下方已验证的调试包使用 `107`。
 - `package.json` 是 npm 项目元数据，`package-lock.json` 是安装依赖的锁定结果。正常改版本应同时更新两者，不能只改其中一个。
 
 更新 npm 版本时可执行：
@@ -92,7 +94,7 @@ H5 在生产环境进入前台时最多每 5 分钟检查一次 `/version.json`�
 
 ### 4.3 Bridge 版本
 
-`budlog-android-shell/src/config/environment.ts` 中的 `BRIDGE_VERSION` 当前为 `1`。只有新增并稳定发布桥接协议时才递增；普通 H5、WebView 修复或原生实现内部优化不修改它。
+`budlog-android-shell/src/config/environment.ts` 中的 `BRIDGE_VERSION` 当前为 `2`。能力版本彼此独立：`BudlogNativeMedia.version` 继续为 `1`，`BudlogNativeWidget.version` 为 `1`。H5 必须检查实际桥接对象和功能版本，不能只依赖启动 URL 的总版本。只有新增并稳定发布桥接协议时才递增；普通 H5、WebView 修复或原生实现内部优化不修改它。
 
 ## 5. 配置与变量
 
@@ -472,10 +474,33 @@ adb shell monkey -p dev.oumuv.budlog -c android.intent.category.LAUNCHER 1
 7. 设置页显示正确的 Android 壳版本和 H5 `buildId`。
 8. 原浏览器 H5 仍可正常使用。
 9. 原生音乐缓存改动需完成两轮播放：首次播放等待缓存完成，强制结束 App 后冷启动，再次播放应直接使用本地文件，且不应再次请求完整音频。
+10. 系统组件选择器能发现“Budlog 今日照护”，设置页可发起 Launcher 固定确认框。
+11. 紧凑、标准、扩展尺寸分别检查；标准和扩展尺寸都采用上层三列信息、下层单行四按钮，仅显示亲喂、瓶喂、尿便、存奶。
+12. 浅色、深色、离线、过期、鉴权失效和服务端不支持状态均可辨识，旧数据不会被失败刷新清空。
+13. 开始亲喂后原生 Chronometer 持续递增；清除或保存后退出计时状态。
+14. 亲喂、瓶喂、尿便、存奶入口分别到达白名单页面，任意外部路由不能注入。
+15. App 在后台被系统回收或仅终止进程后，组件仍显示本地快照；在系统设置中“强行停止”整个包时 Launcher 会显示系统占位符，重新启动 App 后恢复并可继续刷新。
 
 ## 11. 发布描述
 
-### 11.1 Android Shell 1.0.1
+### 11.1 Android 桌面组件（当前源码 1.1.1）
+
+当前源码：Android Shell `1.1.1`（`versionCode 108`），`budlog-native 1.1.4`，总 Bridge `2`；以下已验证调试包仍为 `1.1.0`（`versionCode 107`）。
+
+- 新增“Budlog 今日照护”桌面组件，支持紧凑、标准、扩展尺寸及浅色、深色主题。
+- 标准和扩展尺寸统一采用上层三列信息、下层单行四按钮：尿尿和便便合并为一列，新增存奶总量/今日次数列，按钮仅保留亲喂、瓶喂、尿便、存奶。
+- 亲喂计时使用原生 Chronometer，离开 App 后仍可持续显示。
+- 新增用途隔离的 Widget Session Cookie 和只读摘要接口，不向原生桥接家庭密码。
+- 新增 30 分钟 JobScheduler 刷新、本地快照、离线/过期/鉴权失效状态及 Android 备份排除规则；Android 7+ 使用 5 分钟弹性窗口，实际执行仍可能被系统省电策略延迟。
+- H5 浏览器和旧 APK 在没有 Widget Bridge 时保持静默降级，Media Bridge 继续保持版本 `1`。
+
+最新云端证书调试包：`budlog-android-shell/dist/debug/android_debug_20261004093449.apk`，同步副本为 `dist/debug/android_debug_latest.apk`，SHA-256 均为 `7fac8765a28c7296bf4d389dbd8b25cb293e05708a46999206291588d1bde0cb`，证书 SHA-256 为 `d155988354bac887bb751f8d2801e1c3daf9b367249cc1eff0c87c5d03e270d1`。该包已在 OnePlus 8T 和 Android API 35 模拟器覆盖安装；OnePlus 原 Widget 保留并显示真实快照，模拟器完成字体 `130%` 与深色模式复验，单行四按钮无重叠。
+
+该调试包不替代正式签名 APK 和生产 HTTPS 链路验收。线上 H5 与后端已由用户更新并用于真机联调；无 Cookie 的摘要请求返回 `401`。升级重启后 App 需要重新验证家庭密码，本次没有读取或代填密码；正式发布仍必须按“后端 → 正式签名 APK → H5”的顺序执行，并重新验证 Cookie 自动续签。
+
+现有正式签名候选 `dist/release/apk/__UNI__A5107DE__20261004012443.apk` 生成于最后一次字体和视觉修复之前，不得作为本次最终发布包；正式发布需基于 `budlog-native 1.1.4` 重新云打包。
+
+### 11.2 Android Shell 1.0.1
 
 版本：Android Shell `1.0.1`（`versionCode 10001`），H5 保持 `1.0.0`。
 
@@ -483,7 +508,7 @@ adb shell monkey -p dev.oumuv.budlog -c android.intent.category.LAUNCHER 1
 - 提供 `mdpi`、`hdpi`、`xhdpi`、`xxhdpi` 和 `xxxhdpi` 五档密度资源。
 - 不涉及 H5、后端、数据库或 WebView 行为变化。
 
-### 11.2 Android Shell 1.0.0 与 H5 1.0.0
+### 11.3 Android Shell 1.0.0 与 H5 1.0.0
 
 版本：Android Shell `1.0.0`（`versionCode 10000`），H5 `1.0.0` 发布线。
 

@@ -1,19 +1,42 @@
 <script setup lang="ts">
 import { LockKeyhole, ShieldCheck } from "lucide-vue-next";
 import { NButton, NInput, NSwitch } from "naive-ui";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onUnload } from "@dcloudio/uni-app";
 import { ref } from "vue";
-import { verifyPassword } from "../../api/request";
+import { AccessVerificationError, verifyPassword } from "../../api/request";
 import BrandMark from "../../components/BrandMark.vue";
 import AppPage from "../../components/AppPage.vue";
 import { getPassword, setPassword } from "../../utils/auth";
-import { resetAccessVerification } from "../../utils/guard";
+import { markAccessVerified } from "../../utils/guard";
 import { consumePendingNativeShortcut } from "../../utils/nativeShortcuts";
+import { requestNativeWidgetRefresh } from "../../utils/nativeWidget";
+import { runtime } from "../../utils/runtime";
 
 const password = ref("");
 const remember = ref(true);
 const loading = ref(false);
 const error = ref("");
+const retryAfterSeconds = ref(0);
+
+let retryTimer: ReturnType<typeof setInterval> | undefined;
+
+function stopRetryTimer() {
+  if (retryTimer !== undefined) clearInterval(retryTimer);
+  retryTimer = undefined;
+}
+
+function startRetryTimer(seconds: number) {
+  stopRetryTimer();
+  retryAfterSeconds.value = Math.max(1, Math.ceil(seconds));
+  retryTimer = setInterval(() => {
+    retryAfterSeconds.value -= 1;
+    if (retryAfterSeconds.value <= 0) {
+      retryAfterSeconds.value = 0;
+      stopRetryTimer();
+      error.value = "";
+    }
+  }, 1000);
+}
 
 function enterApplication() {
   uni.reLaunch({ url: consumePendingNativeShortcut() || "/pages/home/index" });
@@ -26,26 +49,33 @@ onLoad(async () => {
     await submit();
     return;
   }
+  if (runtime.isAndroidApp) return;
   try {
     await verifyPassword("");
-    resetAccessVerification();
+    markAccessVerified("");
     enterApplication();
   } catch {
     // Password-protected environments stay on the access page.
   }
 });
 
+onUnload(stopRetryTimer);
+
 async function submit() {
-  if (!password.value || loading.value) return;
+  if (!password.value || loading.value || retryAfterSeconds.value > 0) return;
   loading.value = true;
   error.value = "";
   try {
     await verifyPassword(password.value);
     await setPassword(password.value, remember.value);
-    resetAccessVerification();
+    markAccessVerified(password.value);
+    requestNativeWidgetRefresh();
     enterApplication();
   } catch (exception) {
     error.value = exception instanceof Error ? exception.message : "验证失败";
+    if (exception instanceof AccessVerificationError && exception.statusCode === 429) {
+      startRetryTimer(exception.retryAfterSeconds);
+    }
   } finally {
     loading.value = false;
   }
@@ -97,11 +127,11 @@ async function submit() {
           type="primary"
           size="large"
           block
-          :disabled="!password"
+          :disabled="!password || retryAfterSeconds > 0"
           :loading="loading"
           @click="submit"
         >
-          {{ loading ? "验证中" : "进入 Budlog" }}
+          {{ loading ? "验证中" : retryAfterSeconds > 0 ? `${retryAfterSeconds} 秒后重试` : "进入 Budlog" }}
         </NButton>
       </view>
     </view>

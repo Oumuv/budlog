@@ -22,6 +22,7 @@ interface Plus {
 declare module "@/uni_modules/budlog-native" {
   export function initializeNative(allowedOrigin: string): boolean;
   export function dispatchNative(commandJson: string): string;
+  export function dispatchNativeWidget(commandJson: string): string;
   export function getNativeState(): string;
   export function consumeShortcutRoute(): string;
 }

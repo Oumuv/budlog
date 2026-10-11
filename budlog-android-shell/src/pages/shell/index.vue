@@ -5,6 +5,7 @@ import { BRIDGE_VERSION, parseHttpsUrl, resolveShellEnvironment } from "@/config
 import {
   consumeShortcutRoute,
   dispatchNative,
+  dispatchNativeWidget,
   getNativeState,
   initializeNative,
 } from "@/uni_modules/budlog-native";
@@ -20,7 +21,11 @@ const WEBVIEW_READY_TIMEOUT_MS = 3_000;
 const WEBVIEW_POLL_INTERVAL_MS = 50;
 const NATIVE_STATE_POLL_INTERVAL_MS = 500;
 const NATIVE_MEDIA_URL_PREFIX = "budlog-native://media?payload=";
+const NATIVE_WIDGET_URL_PREFIX = "budlog-native://widget?payload=";
 const MAX_NATIVE_MEDIA_URL_LENGTH = 196_608;
+const MAX_NATIVE_WIDGET_URL_LENGTH = 16_384;
+const MEDIA_BRIDGE_VERSION = "1";
+const WIDGET_BRIDGE_VERSION = "1";
 
 const REMOTE_WEBVIEW_STYLES: RemoteWebviewStyles = {
   "uni-app": "none",
@@ -108,9 +113,12 @@ function emitRemoteEvent(eventName: string, detailJson: string): void {
 
 function installRemoteNativeBridge(webview: PlusWebviewWebviewObject): void {
   if (!nativeInitialized) return;
-  const prefix = JSON.stringify(NATIVE_MEDIA_URL_PREFIX);
-  const version = JSON.stringify(BRIDGE_VERSION);
-  webview.evalJS(`(function(){var bridge=Object.freeze({version:${version},dispatch:function(payload){if(typeof payload!=="string"||payload.length===0||payload.length>65536){throw new Error("Invalid native media command.");}window.location.href=${prefix}+encodeURIComponent(payload);}});try{Object.defineProperty(window,"BudlogNativeMedia",{value:bridge,writable:false,configurable:false});}catch(e){window.BudlogNativeMedia=bridge;}window.dispatchEvent(new CustomEvent("budlog-native-ready",{detail:{version:${version}}}));})();`);
+  const mediaPrefix = JSON.stringify(NATIVE_MEDIA_URL_PREFIX);
+  const widgetPrefix = JSON.stringify(NATIVE_WIDGET_URL_PREFIX);
+  const bridgeVersion = JSON.stringify(BRIDGE_VERSION);
+  const mediaVersion = JSON.stringify(MEDIA_BRIDGE_VERSION);
+  const widgetVersion = JSON.stringify(WIDGET_BRIDGE_VERSION);
+  webview.evalJS(`(function(){var mediaReady=window.BudlogNativeMedia&&window.BudlogNativeMedia.version===${mediaVersion}&&typeof window.BudlogNativeMedia.dispatch==="function";var widgetReady=window.BudlogNativeWidget&&window.BudlogNativeWidget.version===${widgetVersion}&&typeof window.BudlogNativeWidget.dispatch==="function";if(mediaReady&&widgetReady){return;}var mediaBridge=Object.freeze({version:${mediaVersion},dispatch:function(payload){if(typeof payload!=="string"||payload.length===0||payload.length>65536){throw new Error("Invalid native media command.");}window.location.href=${mediaPrefix}+encodeURIComponent(payload);}});var widgetBridge=Object.freeze({version:${widgetVersion},dispatch:function(payload){if(typeof payload!=="string"||payload.length===0||payload.length>4096){throw new Error("Invalid native widget command.");}window.location.href=${widgetPrefix}+encodeURIComponent(payload);}});try{Object.defineProperty(window,"BudlogNativeMedia",{value:mediaBridge,writable:false,configurable:false});}catch(e){window.BudlogNativeMedia=mediaBridge;}try{Object.defineProperty(window,"BudlogNativeWidget",{value:widgetBridge,writable:false,configurable:false});}catch(e){window.BudlogNativeWidget=widgetBridge;}window.dispatchEvent(new CustomEvent("budlog-native-ready",{detail:{version:${bridgeVersion},mediaVersion:${mediaVersion},widgetVersion:${widgetVersion}}}));})();`);
 }
 
 function pollNativeState(): void {
@@ -228,9 +236,37 @@ function handleNativeMediaNavigation(url: string): boolean {
   return true;
 }
 
+function handleNativeWidgetNavigation(url: string): boolean {
+  if (!url.startsWith(NATIVE_WIDGET_URL_PREFIX) || url.length > MAX_NATIVE_WIDGET_URL_LENGTH) {
+    return false;
+  }
+  if (!nativeInitialized) {
+    uni.showToast({ title: "桌面组件服务未就绪", icon: "none" });
+    return true;
+  }
+  try {
+    const command = decodeURIComponent(url.slice(NATIVE_WIDGET_URL_PREFIX.length));
+    const action = (JSON.parse(command) as { action?: unknown }).action;
+    const result = JSON.parse(dispatchNativeWidget(command)) as {
+      ok?: boolean;
+      error?: string;
+      message?: string;
+    };
+    if (!result.ok) {
+      uni.showToast({ title: result.error || "组件操作失败", icon: "none" });
+    } else if (action === "requestPin" && result.message) {
+      uni.showToast({ title: result.message, icon: "none", duration: 2600 });
+    }
+  } catch {
+    uni.showToast({ title: "组件操作失败", icon: "none" });
+  }
+  return true;
+}
+
 function handleRejectedNavigation(result: OverrideUrlResult): void {
   const url = typeof result?.url === "string" ? result.url : "";
   if (url && handleNativeMediaNavigation(url)) return;
+  if (url && handleNativeWidgetNavigation(url)) return;
   notifyRejectedNavigation();
 }
 

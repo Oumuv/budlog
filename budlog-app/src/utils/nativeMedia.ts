@@ -28,7 +28,7 @@ export type NativeMediaCommand =
   | { action: "setSleepTimer"; deadline: number | null };
 
 export function isNativeMediaExpected(): boolean {
-  return runtime.isAndroidApp && runtime.bridgeVersion === "1";
+  return runtime.isAndroidApp;
 }
 
 export function getNativeMediaBridge(): BudlogNativeMediaBridge | undefined {
