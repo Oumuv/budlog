@@ -4,3 +4,8 @@ spring:
       on-profile: prod
   datasource:
     url: "${DB_URL:jdbc:postgresql://${POSTGRESQL_HOST:127.0.0.1}:${POSTGRESQL_PORT:5432}/${POSTGRESQL_PROD_DATABASE:budlog}}"
+
+logging:
+  level:
+    root: info
+    dev.oumuv.budlog: info

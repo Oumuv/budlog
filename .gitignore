@@ -23,3 +23,7 @@ deploy/h5/
 !.docs/Budlog安卓App与H5共存实施计划.md
 !.docs/Budlog构建发布与Android安装指南.md
 !.docs/Budlog人工构建发布简明指南.md
+!.docs/agent-api/
+!.docs/agent-api/README.md
+!.docs/agent-api/openapi.yaml
+!.docs/agent-api/智能体对接说明.md

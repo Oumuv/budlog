@@ -7,6 +7,10 @@ services:
       context: .
       dockerfile: server.Dockerfile
     restart: unless-stopped
+    # Optional, separate Agent config: enabled flag and hashed client digests only.
+    env_file:
+      - path: ../.agent.env
+        required: false
 
     volumes:
       - type: bind
@@ -64,13 +68,19 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      - type: bind
+        source: ./nginx.conf
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+        bind:
+          create_host_path: false
 
     depends_on:
       server:
         condition: service_healthy
 
     ports:
-      - "${BUDLOG_PROD_WEB_PORT:-5173}:80"
+      - "127.0.0.1:${BUDLOG_PROD_WEB_PORT:-5173}:80"
 
     healthcheck:
       test:

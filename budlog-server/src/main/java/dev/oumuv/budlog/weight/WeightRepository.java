@@ -18,6 +18,9 @@ public interface WeightRepository extends JpaRepository<WeightRecord, Long> {
 
     Optional<WeightRecord> findByBabyIdAndRecordDateAndDeletedAtIsNull(Long babyId, LocalDate recordDate);
 
+    Optional<WeightRecord> findFirstByBabyIdAndDeletedAtIsNullAndMeasuredAtLessThanOrderByMeasuredAtDescIdDesc(
+            Long babyId, OffsetDateTime before);
+
     Page<WeightRecord> findAllByBabyIdAndDeletedAtIsNullOrderByRecordDateDescMeasuredAtDesc(
             Long babyId, Pageable pageable);
 
