@@ -9,7 +9,8 @@ import AppNav from "../../components/AppNav.vue";
 import AppPage from "../../components/AppPage.vue";
 import ErrorState from "../../components/ErrorState.vue";
 import type { CalendarItem } from "../../types";
-import { calendarDetailUrl, calendarGroup, calendarItemLabel, monthGrid, shiftMonth } from "../../utils/calendar";
+import { calendarDetailUrl, calendarFilters, calendarGroup, calendarItemLabel, monthGrid, shiftMonth } from "../../utils/calendar";
+import type { CalendarFilter } from "../../utils/calendar";
 import { formatTime, setAppTimezone, shiftDay, todayKey } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
 
@@ -17,6 +18,7 @@ const today = ref(todayKey());
 const selectedDate = ref(today.value);
 const month = ref(today.value.slice(0, 7));
 const items = ref<CalendarItem[]>([]);
+const activeFilter = ref<CalendarFilter>("ALL");
 const loading = ref(true);
 const error = ref("");
 const needsSetup = ref(false);
@@ -26,9 +28,12 @@ let requestId = 0;
 const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
 const dates = computed(() => monthGrid(month.value));
 const monthTitle = computed(() => `${month.value.slice(0, 4)}年${Number(month.value.slice(5))}月`);
+const filteredItems = computed(() => activeFilter.value === "ALL"
+  ? items.value
+  : items.value.filter((item) => calendarGroup(item.category) === activeFilter.value));
 const byDate = computed(() => {
   const result: Record<string, CalendarItem[]> = {};
-  items.value.forEach((item) => (result[item.date] ||= []).push(item));
+  filteredItems.value.forEach((item) => (result[item.date] ||= []).push(item));
   return result;
 });
 const selectedItems = computed(() => byDate.value[selectedDate.value] || []);
@@ -39,6 +44,7 @@ const days = computed(() => dates.value.map((date) => {
 }));
 
 onShow(async () => {
+  activeFilter.value = "ALL";
   if (await ensureAccess()) await load();
 });
 onUnload(() => { requestId += 1; });
@@ -158,12 +164,20 @@ function goSettings() {
                 <button v-for="item in day.preview" :key="item.key" class="day-item" :class="`tone-${itemTone(item)}`" :title="item.title" @click="openItem(item)">{{ calendarItemLabel(item).slice(0, 2) }}</button>
               </view>
             </view>
-            <view class="calendar-legend">
-              <view class="legend-item"><view class="legend-dot legend-dot--task" /><text>任务</text></view>
-              <view class="legend-item"><view class="legend-dot legend-dot--milestone" /><text>日程</text></view>
-              <view class="legend-item"><view class="legend-dot legend-dot--feeding" /><text>节点</text></view>
-              <view class="legend-item"><view class="legend-dot legend-dot--event" /><text>事件</text></view>
-              <view class="legend-item"><view class="legend-dot legend-dot--care" /><text>日常</text></view>
+            <view class="calendar-filters" role="group" aria-label="日历事项筛选">
+              <button
+                v-for="filter in calendarFilters"
+                :key="filter.value"
+                class="filter-button"
+                :class="{ 'filter-button--active': activeFilter === filter.value }"
+                :aria-label="`筛选${filter.label}事项`"
+                :aria-pressed="activeFilter === filter.value"
+                @click="activeFilter = filter.value"
+              >
+                <view class="filter-dot" :class="`filter-dot--${filter.value.toLowerCase()}`" aria-hidden="true" />
+                <text>{{ filter.label }}</text>
+                <text v-if="activeFilter === filter.value" class="filter-check" aria-hidden="true">✓</text>
+              </button>
             </view>
           </view>
 
@@ -180,8 +194,8 @@ function goSettings() {
           </view>
           <view v-else class="calendar-empty surface">
             <image src="/static/ui/baby-sleep.png" mode="aspectFit" />
-            <text class="calendar-empty__title">这一天暂无事项</text>
-            <text class="calendar-empty__copy">可切换日期，查看其他安排与记录</text>
+            <text class="calendar-empty__title">{{ activeFilter === 'ALL' ? '这一天暂无事项' : '这一天暂无此类事项' }}</text>
+            <text class="calendar-empty__copy">{{ activeFilter === 'ALL' ? '可切换日期，查看其他安排与记录' : '可切换筛选或日期，查看其他安排与记录' }}</text>
           </view>
         </template>
       </template>
@@ -223,14 +237,17 @@ function goSettings() {
 .tone-diaper { color: #b87916; background: #fff6df; }
 .tone-storage { color: #15966a; background: var(--baby-green-soft); }
 .tone-weight { color: #7552d4; background: var(--baby-purple-soft); }
-.calendar-legend { display: flex; align-items: center; justify-content: space-evenly; padding: 10px 8px; border-top: 1px solid var(--bud-color-line-soft); color: var(--bud-color-muted); font-size: 9px; }
-.legend-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-.legend-dot { display: block; width: 8px; height: 8px; flex: 0 0 8px; border-radius: 2px; }
-.legend-dot--task { background: var(--baby-blue); }
-.legend-dot--milestone { background: var(--baby-primary); }
-.legend-dot--feeding { background: #55bcd0; }
-.legend-dot--event { background: var(--baby-orange); }
-.legend-dot--care { background: #e8c64b; }
+.calendar-filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; padding: 8px; border-top: 1px solid var(--bud-color-line-soft); }
+.filter-button { display: flex; min-width: 0; min-height: 30px; align-items: center; justify-content: center; gap: 3px; margin: 0; padding: 0 2px; border: 1px solid transparent; border-radius: 7px; color: var(--bud-color-muted); background: transparent; font-size: 9px; line-height: 1; white-space: nowrap; }
+.filter-button::after { border: 0; }
+.filter-button--active { border-color: currentColor; color: var(--bud-color-ink); background: #fff; box-shadow: 0 2px 6px rgba(52, 62, 84, 0.12); font-weight: 800; }
+.filter-dot { display: block; width: 7px; height: 7px; flex: 0 0 7px; border-radius: 2px; }
+.filter-dot--all { border: 1px solid #7e8aa1; background: linear-gradient(135deg, var(--baby-blue) 0 50%, var(--baby-primary) 50% 100%); }
+.filter-dot--task { background: var(--baby-blue); }
+.filter-dot--milestone { background: var(--baby-primary); }
+.filter-dot--event { background: var(--baby-orange); }
+.filter-dot--care { background: #55bcd0; }
+.filter-check { flex: 0 0 auto; font-size: 9px; font-weight: 900; }
 .agenda-heading { margin-top: 16px; }
 .agenda-list { display: grid; gap: 7px; }
 .agenda-item { display: grid; width: 100%; grid-template-columns: 42px minmax(0, 1fr) 16px; align-items: center; gap: 8px; margin: 0; padding: 11px 10px; text-align: left; }
