@@ -5,10 +5,10 @@ export type CalendarFilter = "ALL" | "TASK" | "MILESTONE" | "EVENT" | "CARE";
 
 export const calendarFilters: Array<{ value: CalendarFilter; label: string }> = [
   { value: "ALL", label: "全部" },
-  { value: "TASK", label: "任务日程" },
-  { value: "MILESTONE", label: "关键节点" },
+  { value: "TASK", label: "任务" },
+  { value: "MILESTONE", label: "节点" },
   { value: "EVENT", label: "事件" },
-  { value: "CARE", label: "日常记录" },
+  { value: "CARE", label: "日常" },
 ];
 
 export const categoryLabels: Record<CalendarCategory, string> = {

@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { Play, Save, Square, Timer, Trash2, X } from "lucide-vue-next";
-import { NButton, NInput, NInputNumber, NSwitch } from "naive-ui";
+import { ChevronDown, ChevronUp, History, Play, Save, SlidersHorizontal, Square, Timer, Trash2, X } from "lucide-vue-next";
+import { NButton, NInput, NInputNumber } from "naive-ui";
 import { onBackPress, onHide, onLoad, onShow, onUnload } from "@dcloudio/uni-app";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { api } from "../../api";
 import AppLoading from "../../components/AppLoading.vue";
 import AppPage from "../../components/AppPage.vue";
 import DateTimeField from "../../components/DateTimeField.vue";
+import OptionalNoteField from "../../components/OptionalNoteField.vue";
 import PageHeader from "../../components/PageHeader.vue";
 import SegmentedControl from "../../components/SegmentedControl.vue";
 import { useTimerStore } from "../../stores/timer";
-import type { BreastSide, FeedingType } from "../../types";
-import { nowLocalInput, toIso, toLocalInput, uuid } from "../../utils/date";
+import type { BreastSide, FeedingRecord, FeedingType } from "../../types";
+import { formatDateTime, nowLocalInput, toIso, toLocalInput, uuid } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
 
 const timerStore = useTimerStore();
@@ -21,6 +22,7 @@ const loading = ref(false);
 const saving = ref(false);
 const deleting = ref(false);
 const dirty = ref(false);
+const moreOpen = ref(false);
 const tick = ref(Date.now());
 let hydrating = true;
 let clock: ReturnType<typeof setInterval> | undefined;
@@ -30,8 +32,7 @@ const form = reactive({
   feedingType: "BREAST_DIRECT" as FeedingType,
   breastSide: "BOTH" as BreastSide | "",
   startTime: nowLocalInput(),
-  endTime: nowLocalInput(),
-  hasEnd: true,
+  durationMinutes: "",
   amountMl: "",
   note: "",
 });
@@ -45,6 +46,11 @@ const feedingTypeOptions = [
   { value: "BREAST_BOTTLE", label: "母乳瓶喂" },
   { value: "FORMULA_BOTTLE", label: "奶粉瓶喂" },
 ];
+const availableFeedingTypeOptions = computed(() => (
+  mode.value === "bottle" && !recordId.value
+    ? feedingTypeOptions.filter((option) => option.value !== "BREAST_DIRECT")
+    : feedingTypeOptions
+));
 const sideOptions = [
   { value: "LEFT", label: "左侧" },
   { value: "RIGHT", label: "右侧" },
@@ -53,17 +59,35 @@ const sideOptions = [
 const optionalSideOptions = [{ value: "", label: "不选择" }, ...sideOptions];
 const LAST_BOTTLE_AMOUNT_KEY = "budlog.feeding.lastBottleAmount";
 const lastBottleAmount = ref<number>();
-const amountPresets = computed(() => {
-  const values = [30, 60, 90, 120, 150, 180];
-  const options = values.map((value) => ({ value, label: String(value) }));
-  if (lastBottleAmount.value && !values.includes(lastBottleAmount.value)) {
-    options.unshift({ value: lastBottleAmount.value, label: `上次 ${lastBottleAmount.value}` });
-  }
-  return options;
-});
+const lastBottleRecord = ref<FeedingRecord>();
+const latestBottleLoadFailed = ref(false);
+const amountPresets = [60, 90, 120];
+const durationPresets = [5, 10, 15, 20];
 const amountValue = computed<number | null>({
   get: () => form.amountMl === "" ? null : Number(form.amountMl),
   set: (value) => { form.amountMl = value === null ? "" : String(value); },
+});
+const durationValue = computed<number | null>({
+  get: () => form.durationMinutes === "" ? null : Number(form.durationMinutes),
+  set: (value) => { form.durationMinutes = value === null ? "" : String(value); },
+});
+const lastBottleSelected = computed(() => (
+  lastBottleAmount.value !== undefined && Number(form.amountMl) === lastBottleAmount.value
+));
+const lastBottleContext = computed(() => {
+  const record = lastBottleRecord.value;
+  if (!record) return "本机保存的上次奶量";
+  const type = record.feedingType === "FORMULA_BOTTLE" ? "奶粉瓶喂" : "母乳瓶喂";
+  return `${type} · ${formatDateTime(record.startTime)}`;
+});
+const moreOptionsSummary = computed(() => {
+  const details: string[] = [];
+  if (form.feedingType === "BREAST_BOTTLE" && form.breastSide) {
+    const label = sideOptions.find((option) => option.value === form.breastSide)?.label;
+    if (label) details.push(label);
+  }
+  if (form.note.trim()) details.push("已填写备注");
+  return details.length ? details.join(" · ") : "侧别、备注";
 });
 
 watch(form, () => {
@@ -83,8 +107,16 @@ onLoad(async (options) => {
   if (id) {
     recordId.value = id;
     await loadRecord(id);
-  } else if (mode.value !== "bottle" && timerStore.draft) {
-    form.breastSide = timerStore.draft.breastSide;
+  } else {
+    if (mode.value !== "bottle" && timerStore.draft) form.breastSide = timerStore.draft.breastSide;
+    if (!isTimerPage.value) {
+      loading.value = true;
+      try {
+        await loadLatestBottle(mode.value === "bottle");
+      } finally {
+        loading.value = false;
+      }
+    }
   }
   await nextTick();
   hydrating = false;
@@ -129,10 +161,10 @@ async function loadRecord(id: number) {
     form.feedingType = record.feedingType;
     form.breastSide = record.breastSide || "";
     form.startTime = toLocalInput(record.startTime);
-    form.endTime = toLocalInput(record.endTime || record.startTime);
-    form.hasEnd = Boolean(record.endTime);
+    form.durationMinutes = record.durationMinutes ? String(record.durationMinutes) : "";
     form.amountMl = record.amountMl === undefined ? "" : String(record.amountMl);
     form.note = record.note || "";
+    moreOpen.value = record.feedingType !== "BREAST_DIRECT" && Boolean(record.breastSide || record.note);
   } catch (exception) {
     uni.showToast({ title: exception instanceof Error ? exception.message : "加载失败", icon: "none" });
   } finally {
@@ -149,6 +181,32 @@ function updateFeedingType(value: string | number) {
     form.breastSide = "";
   } else if (nextType === "BREAST_DIRECT" && !form.breastSide) {
     form.breastSide = "BOTH";
+  }
+  if (nextType !== "BREAST_DIRECT" && !form.amountMl && lastBottleAmount.value) useLastBottleAmount();
+  if (nextType === "BREAST_DIRECT") moreOpen.value = false;
+}
+
+async function loadLatestBottle(prefill: boolean) {
+  latestBottleLoadFailed.value = false;
+  try {
+    const record = await api.latestBottleFeeding();
+    if (record?.amountMl && record.feedingType !== "BREAST_DIRECT") {
+      lastBottleRecord.value = record;
+      lastBottleAmount.value = Number(record.amountMl);
+      uni.setStorageSync(LAST_BOTTLE_AMOUNT_KEY, lastBottleAmount.value);
+      if (prefill) {
+        form.feedingType = record.feedingType;
+        form.breastSide = "";
+        useLastBottleAmount();
+      }
+      return;
+    }
+    lastBottleRecord.value = undefined;
+    lastBottleAmount.value = undefined;
+    uni.removeStorageSync(LAST_BOTTLE_AMOUNT_KEY);
+  } catch {
+    latestBottleLoadFailed.value = true;
+    if (prefill && lastBottleAmount.value) useLastBottleAmount();
   }
 }
 
@@ -196,10 +254,15 @@ function cancelTimer() {
 
 function validate(): string | undefined {
   if (isDirect.value && !form.breastSide) return "请选择亲喂侧别";
+  if (isDirect.value && form.durationMinutes) {
+    const duration = Number(form.durationMinutes);
+    if (!Number.isInteger(duration) || duration < 1 || duration > 240) return "亲喂时长请输入 1 至 240 分钟";
+    const endTime = new Date(toIso(form.startTime)).getTime() + duration * 60_000;
+    if (endTime > Date.now() + 5 * 60_000) return "开始时间加亲喂时长不能晚于当前时间";
+  }
   if (isBottle.value && (!form.amountMl || !Number.isFinite(Number(form.amountMl)) || Number(form.amountMl) <= 0)) {
     return "请输入有效的瓶喂奶量";
   }
-  if (form.hasEnd && new Date(toIso(form.endTime)).getTime() < new Date(toIso(form.startTime)).getTime()) return "结束时间不能早于开始时间";
   return undefined;
 }
 
@@ -217,7 +280,7 @@ async function save() {
       feedingType: form.feedingType,
       breastSide: form.feedingType === "FORMULA_BOTTLE" || !form.breastSide ? undefined : form.breastSide,
       startTime: toIso(form.startTime),
-      endTime: isDirect.value && form.hasEnd ? toIso(form.endTime) : undefined,
+      endTime: isDirect.value && form.durationMinutes ? endTimeForDuration() : undefined,
       amountMl: isBottle.value ? Number(form.amountMl) : undefined,
       note: form.note.trim() || undefined,
     };
@@ -269,12 +332,28 @@ function formatTimer(seconds: number) {
 function setAmount(amount: number) {
   form.amountMl = String(amount);
 }
+
+function setDuration(minutes: number) {
+  form.durationMinutes = String(minutes);
+}
+
+function endTimeForDuration(): string {
+  const instant = new Date(toIso(form.startTime)).getTime() + Number(form.durationMinutes) * 60_000;
+  return new Date(instant).toISOString();
+}
+
+function useLastBottleAmount() {
+  if (lastBottleAmount.value) setAmount(lastBottleAmount.value);
+}
 </script>
 
 <template>
   <AppPage>
-    <view class="page-shell page-shell--form feeding-page">
-    <PageHeader :title="recordId ? '编辑喂奶记录' : isTimerPage ? '亲喂计时' : '记录喂奶'" back />
+    <view
+      class="page-shell page-shell--form feeding-page"
+      :class="{ 'feeding-page--quick-bottle': !recordId && isBottle }"
+    >
+    <PageHeader :title="recordId ? '编辑喂奶记录' : isTimerPage ? '亲喂计时' : mode === 'bottle' ? '记录瓶喂' : '记录喂奶'" back />
 
     <AppLoading v-if="loading" copy="正在加载喂奶记录" />
 
@@ -284,10 +363,7 @@ function setAmount(amount: number) {
         <text class="timer-panel__label">{{ timerStore.draft.breastSide === 'LEFT' ? '左侧' : timerStore.draft.breastSide === 'RIGHT' ? '右侧' : '双侧' }}</text>
         <text class="timer-panel__time">{{ formatTimer(elapsedSeconds) }}</text>
         <text class="timer-panel__started">开始于 {{ toLocalInput(timerStore.draft.startTime).slice(11) }}</text>
-        <view class="field timer-note">
-          <text class="field__label">备注</text>
-          <NInput v-model:value="form.note" type="textarea" :maxlength="500" :autosize="{ minRows: 2, maxRows: 5 }" placeholder="可选" />
-        </view>
+        <OptionalNoteField v-model="form.note" class="timer-note" />
         <view class="timer-actions">
           <NButton type="error" size="large" secondary block @click="cancelTimer"><X :size="18" />取消</NButton>
           <NButton type="primary" size="large" block :loading="saving" @click="stopAndSave"><Square :size="18" />{{ saving ? "保存中" : "停止并保存" }}</NButton>
@@ -305,12 +381,12 @@ function setAmount(amount: number) {
     <view v-else-if="!loading" class="feeding-form surface">
       <view class="field">
         <text class="field__label">喂奶类型</text>
-        <SegmentedControl :model-value="form.feedingType" :options="feedingTypeOptions" @update:model-value="updateFeedingType" />
+        <SegmentedControl :model-value="form.feedingType" :options="availableFeedingTypeOptions" @update:model-value="updateFeedingType" />
       </view>
 
-      <view v-if="form.feedingType !== 'FORMULA_BOTTLE'" class="field">
-        <text class="field__label">侧别{{ isDirect ? '' : '（可选）' }}</text>
-        <SegmentedControl v-model="form.breastSide" :options="isDirect ? sideOptions : optionalSideOptions" />
+      <view v-if="isDirect" class="field">
+        <text class="field__label">侧别</text>
+        <SegmentedControl v-model="form.breastSide" :options="sideOptions" />
       </view>
 
       <view class="field">
@@ -319,24 +395,59 @@ function setAmount(amount: number) {
       </view>
 
       <template v-if="isDirect">
-        <view class="toggle-end">
-          <view>
-            <text class="toggle-end__title">填写结束时间</text>
-            <text class="toggle-end__copy">关闭后仅保存开始时间</text>
+        <view class="field">
+          <text class="field__label">亲喂时长（分钟，可选）</text>
+          <view class="amount-stepper">
+            <NInputNumber
+              v-model:value="durationValue"
+              size="large"
+              :min="1"
+              :max="240"
+              :step="5"
+              :precision="0"
+              button-placement="both"
+              placeholder="未记录"
+            />
+            <text class="amount-stepper__unit">分钟</text>
           </view>
-          <NSwitch v-model:value="form.hasEnd" />
-        </view>
-        <view v-if="form.hasEnd" class="field">
-          <text class="field__label">结束时间</text>
-          <DateTimeField v-model="form.endTime" title="选择结束时间" quick-record :max-now-offset-minutes="5" />
+          <view class="duration-presets shortcut-row">
+            <button
+              v-for="minutes in durationPresets"
+              :key="minutes"
+              class="shortcut-chip duration-preset"
+              :class="{ 'shortcut-chip--active': Number(form.durationMinutes) === minutes }"
+              @click="setDuration(minutes)"
+            >
+              {{ minutes }} 分钟
+            </button>
+          </view>
         </view>
       </template>
 
       <view v-if="isBottle" class="field">
         <text class="field__label">奶量（ml）</text>
+        <button
+          v-if="lastBottleAmount && !recordId"
+          class="last-bottle-action"
+          :class="{ 'last-bottle-action--active': lastBottleSelected }"
+          :aria-pressed="lastBottleSelected"
+          hover-class="none"
+          @click="useLastBottleAmount"
+        >
+          <History :size="19" />
+          <view class="last-bottle-action__body">
+            <text class="last-bottle-action__title">上次 {{ lastBottleAmount }} ml</text>
+            <text class="last-bottle-action__meta">{{ lastBottleContext }}</text>
+          </view>
+          <text class="last-bottle-action__state">{{ lastBottleSelected ? "已沿用" : "填入" }}</text>
+        </button>
+        <text v-if="latestBottleLoadFailed" class="last-bottle-sync-hint" role="status">
+          {{ lastBottleAmount ? "家庭记录同步失败，当前使用本机记录" : "未能读取家庭上次奶量，请手动填写" }}
+        </text>
         <view class="amount-stepper">
           <NInputNumber
             v-model:value="amountValue"
+            size="large"
             :min="1"
             :max="1000"
             :step="10"
@@ -346,28 +457,53 @@ function setAmount(amount: number) {
           />
           <text class="amount-stepper__unit">ml</text>
         </view>
-        <view class="amount-presets shortcut-row">
+        <view v-if="!lastBottleAmount" class="amount-presets shortcut-row">
           <button
-            v-for="option in amountPresets"
-            :key="option.value"
+            v-for="amount in amountPresets"
+            :key="amount"
             class="shortcut-chip amount-preset"
-            :class="{ 'shortcut-chip--active': Number(form.amountMl) === option.value }"
-            @click="setAmount(option.value)"
+            :class="{ 'shortcut-chip--active': Number(form.amountMl) === amount }"
+            @click="setAmount(amount)"
           >
-            {{ option.label }}
+            {{ amount }}
           </button>
         </view>
-        <text v-if="lastBottleAmount" class="field__hint">上次记录 {{ lastBottleAmount }} ml</text>
       </view>
 
-      <view class="field">
-        <text class="field__label">备注</text>
-        <NInput v-model:value="form.note" type="textarea" :maxlength="500" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="可选" />
-      </view>
+      <OptionalNoteField v-if="isDirect" v-model="form.note" />
+      <template v-else>
+        <button
+          class="more-options-toggle"
+          :aria-expanded="moreOpen"
+          hover-class="none"
+          @click="moreOpen = !moreOpen"
+        >
+          <SlidersHorizontal :size="19" />
+          <view class="more-options-toggle__body">
+            <text class="more-options-toggle__title">更多选项</text>
+            <text class="more-options-toggle__summary">{{ moreOptionsSummary }}</text>
+          </view>
+          <ChevronUp v-if="moreOpen" :size="19" />
+          <ChevronDown v-else :size="19" />
+        </button>
+        <view v-if="moreOpen" class="more-options-panel">
+          <view v-if="form.feedingType === 'BREAST_BOTTLE'" class="field">
+            <text class="field__label">侧别（可选）</text>
+            <SegmentedControl v-model="form.breastSide" :options="optionalSideOptions" />
+          </view>
+          <view class="field more-options-note">
+            <text class="field__label">备注（可选）</text>
+            <NInput v-model:value="form.note" type="textarea" :maxlength="500" :autosize="{ minRows: 2, maxRows: 5 }" placeholder="可选" />
+          </view>
+        </view>
+      </template>
 
-      <view class="form-actions feeding-actions">
+      <view
+        class="form-actions feeding-actions"
+        :class="{ 'feeding-actions--quick': !recordId && isBottle }"
+      >
         <NButton v-if="recordId" type="error" size="large" secondary block :loading="deleting" @click="remove"><Trash2 :size="18" />删除</NButton>
-        <NButton type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : "保存" }}</NButton>
+        <NButton type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : recordId ? "保存修改" : isBottle ? "保存本次瓶喂" : "保存喂奶记录" }}</NButton>
       </view>
     </view>
     </view>
@@ -380,45 +516,91 @@ function setAmount(amount: number) {
   padding: 16px;
 }
 
-.toggle-end {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 66px;
-  gap: 16px;
-  margin-bottom: 14px;
-  border-top: 1px solid var(--bud-color-line-soft);
-  border-bottom: 1px solid var(--bud-color-line-soft);
-}
-
-.toggle-end__title,
-.toggle-end__copy {
-  display: block;
-}
-
-.toggle-end__title {
-  font-size: 14px;
-  font-weight: 650;
-}
-
-.toggle-end__copy {
-  margin-top: 2px;
-  color: var(--bud-color-muted);
-  font-size: 12px;
-}
-
-.amount-presets {
+.amount-presets,
+.duration-presets {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
   margin-top: 8px;
 }
 
-.amount-preset {
+.amount-presets {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.duration-presets {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.amount-preset,
+.duration-preset {
   width: 100%;
+  min-height: 46px;
   min-width: 0;
   padding-right: 8px;
   padding-left: 8px;
+}
+
+.last-bottle-action {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  min-height: 54px;
+  margin: 0 0 8px;
+  padding: 7px 11px;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #cfe1fb;
+  border-radius: 8px;
+  color: #246bb8;
+  background: #f2f7ff;
+  text-align: left;
+  touch-action: manipulation;
+}
+
+.last-bottle-action--active {
+  border-color: #8fb9ef;
+  background: #e8f2ff;
+}
+
+.last-bottle-action__body {
+  min-width: 0;
+}
+
+.last-bottle-action__title,
+.last-bottle-action__meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.last-bottle-action__title {
+  color: var(--bud-color-ink);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 780;
+}
+
+.last-bottle-action__meta {
+  margin-top: 2px;
+  color: var(--bud-color-muted);
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.last-bottle-action__state {
+  color: #246bb8;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.last-bottle-sync-hint {
+  display: block;
+  margin: -2px 0 10px;
+  color: var(--baby-danger);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .amount-stepper {
@@ -436,6 +618,65 @@ function setAmount(amount: number) {
   color: var(--bud-color-muted);
   font-size: 14px;
   font-weight: 650;
+}
+
+.more-options-toggle {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  min-height: 54px;
+  margin: 0 0 20px;
+  padding: 7px 12px;
+  grid-template-columns: 22px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--bud-color-line-soft);
+  border-radius: 8px;
+  color: var(--bud-color-body);
+  background: var(--bud-color-surface);
+  text-align: left;
+}
+
+.more-options-toggle > .lucide:first-child {
+  color: var(--bud-color-primary);
+}
+
+.more-options-toggle > .lucide:last-child {
+  color: var(--bud-color-muted);
+}
+
+.more-options-toggle__body,
+.more-options-toggle__title,
+.more-options-toggle__summary {
+  display: block;
+  min-width: 0;
+}
+
+.more-options-toggle__title {
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.more-options-toggle__summary {
+  margin-top: 1px;
+  overflow: hidden;
+  color: var(--bud-color-muted);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more-options-panel {
+  margin: -10px 0 20px;
+  padding: 14px 12px 0;
+  border: 1px solid var(--bud-color-line-soft);
+  border-radius: 8px;
+  background: var(--bud-color-canvas);
+}
+
+.more-options-note {
+  margin-bottom: 14px;
 }
 
 .timer-panel {
@@ -519,6 +760,35 @@ function setAmount(amount: number) {
 @media (max-width: 360px) {
   .timer-actions {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .feeding-page--quick-bottle {
+    padding-bottom: calc(108px + env(safe-area-inset-bottom));
+  }
+
+  .feeding-page--quick-bottle .feeding-form {
+    animation: none;
+    transform: none;
+  }
+
+  .feeding-actions--quick {
+    box-sizing: border-box;
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    z-index: 30;
+    width: min(430px, 100%);
+    margin: 0;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: var(--bud-color-canvas);
+    box-shadow: 0 -8px 20px rgba(69, 80, 106, 0.1);
+    transform: translateX(-50%);
+  }
+
+  .feeding-actions--quick :deep(.n-button) {
+    height: 52px;
   }
 }
 </style>

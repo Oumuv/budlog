@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-vue-next";
+import { Check, Pencil, Plus, Repeat, RotateCcw, Trash2, X } from "lucide-vue-next";
 import { onShow } from "@dcloudio/uni-app";
 import { computed, ref } from "vue";
 import { api } from "../../api";
@@ -8,7 +8,7 @@ import AppNav from "../../components/AppNav.vue";
 import AppPage from "../../components/AppPage.vue";
 import EmptyState from "../../components/EmptyState.vue";
 import ErrorState from "../../components/ErrorState.vue";
-import type { TaskStatus, TodoTask } from "../../types";
+import type { TaskRecurrenceScope, TaskStatus, TodoTask } from "../../types";
 import { formatDateTime, todayKey } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
 import { clearShownReminder } from "../../utils/reminders";
@@ -61,14 +61,28 @@ async function load() {
   }
 }
 
-async function setStatus(task: TodoTask, status: TaskStatus) {
+async function setStatus(task: TodoTask, status: TaskStatus, recurrenceScope?: TaskRecurrenceScope) {
   try {
-    await api.updateTaskStatus(task.id, status);
+    await api.updateTaskStatus(task.id, status, recurrenceScope);
     clearShownReminder(task.id);
     await load();
   } catch (exception) {
     uni.showToast({ title: exception instanceof Error ? exception.message : "任务更新失败", icon: "none" });
   }
+}
+
+function cancelTask(task: TodoTask) {
+  if (task.recurrenceType === "ONCE") {
+    void setStatus(task, "CANCELED");
+    return;
+  }
+  uni.showActionSheet({
+    itemList: ["仅取消本次", "停止整个循环"],
+    success: ({ tapIndex }) => {
+      const scope: TaskRecurrenceScope = tapIndex === 0 ? "OCCURRENCE" : "SERIES";
+      void setStatus(task, "CANCELED", scope);
+    },
+  });
 }
 
 function go(url: string) {
@@ -96,6 +110,10 @@ function remove(task: TodoTask) {
 function statusLabel(status: TaskStatus) {
   return status === "TODO" ? "待处理" : status === "DONE" ? "已完成" : "已取消";
 }
+
+function recurrenceLabel(task: TodoTask) {
+  return task.recurrenceType === "DAILY" ? "每天" : task.recurrenceType === "WEEKLY" ? "每周" : "";
+}
 </script>
 
 <template>
@@ -121,19 +139,26 @@ function statusLabel(status: TaskStatus) {
           <view class="task-list">
             <view v-for="task in group.tasks" :key="task.id" class="task-card surface" :class="`task-card--${task.status.toLowerCase()}`">
               <button v-if="task.status === 'TODO'" class="task-check" aria-label="标记完成" title="标记完成" @click="setStatus(task, 'DONE')" />
-              <button v-else class="task-check task-check--done" aria-label="恢复为待处理" title="恢复为待处理" @click="setStatus(task, 'TODO')"><Check :size="15" /></button>
+              <button v-else-if="!task.nextOccurrenceCreated" class="task-check task-check--done" aria-label="恢复为待处理" title="恢复为待处理" @click="setStatus(task, 'TODO')"><Check :size="15" /></button>
+              <view v-else class="task-check" :class="task.status === 'DONE' ? 'task-check--done' : 'task-check--canceled'" aria-hidden="true">
+                <Check v-if="task.status === 'DONE'" :size="15" />
+                <X v-else :size="14" />
+              </view>
               <view class="task-card__body" @click="go(`/pages/task-edit/index?id=${task.id}`)">
                 <view class="task-card__title-line">
                   <text class="task-card__title">{{ task.title }}</text>
-                  <text class="task-card__status" :class="`task-card__status--${task.status.toLowerCase()}`">{{ statusLabel(task.status) }}</text>
+                  <view class="task-card__badges">
+                    <view v-if="task.recurrenceType !== 'ONCE'" class="task-card__recurrence"><Repeat :size="10" />{{ recurrenceLabel(task) }}</view>
+                    <text class="task-card__status" :class="`task-card__status--${task.status.toLowerCase()}`">{{ statusLabel(task.status) }}</text>
+                  </view>
                 </view>
                 <text class="task-card__time" :class="{ 'danger-text': task.overdue }">{{ formatDateTime(task.dueTime) }}</text>
                 <text v-if="task.description" class="task-card__description">{{ task.description }}</text>
               </view>
               <view class="task-card__actions">
-                <button class="task-action" aria-label="编辑任务" title="编辑任务" @click="go(`/pages/task-edit/index?id=${task.id}`)"><Pencil :size="15" /></button>
-                <button v-if="task.status === 'TODO'" class="task-action" aria-label="取消任务" title="取消任务" @click="setStatus(task, 'CANCELED')"><X :size="16" /></button>
-                <button v-if="task.status !== 'TODO'" class="task-action" aria-label="恢复任务" title="恢复任务" @click="setStatus(task, 'TODO')"><RotateCcw :size="15" /></button>
+                <button v-if="!task.nextOccurrenceCreated" class="task-action" aria-label="编辑任务" title="编辑任务" @click="go(`/pages/task-edit/index?id=${task.id}`)"><Pencil :size="15" /></button>
+                <button v-if="task.status === 'TODO'" class="task-action" aria-label="取消任务" title="取消任务" @click="cancelTask(task)"><X :size="16" /></button>
+                <button v-if="task.status !== 'TODO' && !task.nextOccurrenceCreated" class="task-action" aria-label="恢复任务" title="恢复任务" @click="setStatus(task, 'TODO')"><RotateCcw :size="15" /></button>
                 <button class="task-action task-action--delete" aria-label="删除任务" title="删除任务" @click="remove(task)"><Trash2 :size="15" /></button>
               </view>
             </view>
@@ -167,9 +192,12 @@ function statusLabel(status: TaskStatus) {
 .task-card--canceled { opacity: 0.72; }
 .task-check { display: flex; width: 22px; height: 22px; align-items: center; justify-content: center; margin: 0; padding: 0; border: 1.5px solid #b9c4d5; border-radius: 50%; background: #fff; }
 .task-check--done { border-color: #48c997; color: #1e9c70; background: #e2f8ef; }
+.task-check--canceled { border-color: #c4cad3; color: var(--bud-color-muted); background: #f1f3f6; }
 .task-card__body { min-width: 0; }
 .task-card__title-line { display: flex; min-width: 0; min-height: 22px; align-items: center; justify-content: space-between; gap: 6px; }
 .task-card__title { min-width: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 19px; font-weight: 750; }
+.task-card__badges { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
+.task-card__recurrence { display: flex; align-items: center; gap: 3px; padding: 3px 6px; border-radius: 5px; color: #376a9f; background: #eaf4ff; font-size: 9px; font-weight: 700; }
 .task-card__status { flex: 0 0 auto; padding: 3px 6px; border-radius: 5px; font-size: 9px; font-weight: 700; }
 .task-card__status--todo { color: #c27b09; background: var(--baby-yellow-soft); }
 .task-card__status--done { color: #1b9b6c; background: var(--baby-green-soft); }

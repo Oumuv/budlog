@@ -16,9 +16,10 @@ public class TaskResponse {
     private String description;
     private OffsetDateTime dueTime;
     private OffsetDateTime remindTime;
+    private TaskRecurrenceType recurrenceType;
+    private boolean nextOccurrenceCreated;
     private TaskStatus status;
     private OffsetDateTime completedAt;
     private boolean overdue;
     private boolean reminderDue;
 }
-

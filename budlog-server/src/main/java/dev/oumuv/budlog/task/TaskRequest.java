@@ -27,5 +27,6 @@ public class TaskRequest {
     private OffsetDateTime dueTime;
 
     private OffsetDateTime remindTime;
-}
 
+    private TaskRecurrenceType recurrenceType;
+}

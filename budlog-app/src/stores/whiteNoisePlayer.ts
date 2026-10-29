@@ -1,6 +1,14 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import type { WhiteNoisePlaylist, WhiteNoiseTrack } from "../types";
+import {
+  dispatchNativeMedia,
+  getNativeMediaBridge,
+  isNativeMediaExpected,
+  isNativeMediaState,
+  type NativeMediaQueueItem,
+} from "../utils/nativeMedia";
+import { pruneWhiteNoiseCache, WHITE_NOISE_CACHE_CLEARED_EVENT } from "../utils/whiteNoiseCache";
 
 interface TrackContext {
   playlist: WhiteNoisePlaylist;
@@ -11,12 +19,15 @@ interface TrackContext {
 let audio: HTMLAudioElement | undefined;
 let timerInterval: ReturnType<typeof setInterval> | undefined;
 let lifecycleBound = false;
+let nativeLifecycleBound = false;
+let playbackBackend: "native" | "web" | null = null;
 
 export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
   const playlists = ref<WhiteNoisePlaylist[]>([]);
   const selectedPlaylistId = ref("");
   const currentTrackId = ref("");
   const playing = ref(false);
+  const preparing = ref(false);
   const currentTime = ref(0);
   const duration = ref(0);
   const singleLoop = ref(true);
@@ -26,6 +37,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
   const sleepDeadline = ref<number | null>(null);
   const sleepRemainingSeconds = ref(0);
   const mediaSessionSupported = ref(false);
+  const nativePlaybackSupported = ref(false);
 
   const currentContext = computed<TrackContext | undefined>(() => findTrack(currentTrackId.value));
   const currentTrack = computed(() => currentContext.value?.track);
@@ -37,7 +49,9 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
   });
 
   function initialize() {
-    ensureAudio();
+    bindNativeLifecycle();
+    nativePlaybackSupported.value = Boolean(getNativeMediaBridge());
+    if (!isNativeMediaExpected()) ensureAudio();
     bindLifecycle();
     checkSleepTimer();
   }
@@ -48,31 +62,46 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
     audio.preload = "metadata";
     audio.loop = singleLoop.value;
     audio.addEventListener("play", () => {
+      if (playbackBackend !== "web") return;
+      preparing.value = false;
       playing.value = true;
       playerError.value = "";
       updateMediaSessionState();
     });
     audio.addEventListener("pause", () => {
+      if (playbackBackend !== "web") return;
       playing.value = false;
       updateMediaSessionState();
+    });
+    audio.addEventListener("loadstart", () => {
+      if (playbackBackend === "web" && currentTrackId.value) preparing.value = true;
+    });
+    audio.addEventListener("waiting", () => {
+      if (playbackBackend === "web" && currentTrackId.value) preparing.value = true;
+    });
+    audio.addEventListener("canplay", () => {
+      if (playbackBackend === "web") preparing.value = false;
     });
     audio.addEventListener("loadedmetadata", syncAudioState);
     audio.addEventListener("durationchange", syncAudioState);
     audio.addEventListener("timeupdate", () => {
+      if (playbackBackend !== "web") return;
       syncAudioState();
       checkSleepTimer();
       updateMediaSessionPosition();
     });
     audio.addEventListener("volumechange", () => {
-      if (audio) volume.value = audio.volume;
+      if (audio && playbackBackend === "web") volume.value = audio.volume;
     });
     audio.addEventListener("ended", () => {
+      if (playbackBackend !== "web") return;
       if (singleLoop.value) return;
       if (canNext.value) void playNext();
       else playing.value = false;
     });
     audio.addEventListener("error", () => {
-      if (!currentTrackId.value) return;
+      if (!currentTrackId.value || playbackBackend !== "web") return;
+      preparing.value = false;
       playing.value = false;
       playerError.value = "音频加载失败，请重新扫描后再试";
       updateMediaSessionState();
@@ -84,6 +113,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
 
   function setPlaylists(next: WhiteNoisePlaylist[]) {
     playlists.value = next;
+    void pruneWhiteNoiseCache(next);
     if (!next.some((item) => item.id === selectedPlaylistId.value)) {
       selectedPlaylistId.value = next[0]?.id || "";
     }
@@ -101,6 +131,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
 
   async function toggleTrack(trackId: string) {
     if (trackId === currentTrackId.value) {
+      if (preparing.value && !playing.value) return;
       if (playing.value) pausePlayback();
       else await resumePlayback();
       return;
@@ -110,11 +141,25 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
 
   async function playTrack(trackId: string) {
     const context = findTrack(trackId);
+    if (!context) {
+      playerError.value = "未找到要播放的白噪音";
+      return;
+    }
+    if (getNativeMediaBridge()) {
+      playTrackNatively(context);
+      return;
+    }
+    if (isNativeMediaExpected()) {
+      nativePlaybackSupported.value = false;
+      playerError.value = "原生播放服务未就绪，请重新打开应用";
+      return;
+    }
     const player = ensureAudio();
-    if (!context || !player) {
+    if (!player) {
       playerError.value = "当前浏览器无法创建音频播放器";
       return;
     }
+    playbackBackend = "web";
     playerError.value = "";
     currentTrackId.value = context.track.id;
     selectedPlaylistId.value = context.playlist.id;
@@ -136,17 +181,86 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
     }
   }
 
-  async function resumePlayback() {
-    const player = ensureAudio();
-    if (!player) {
-      playerError.value = "当前浏览器无法创建音频播放器";
-      return;
+  function playTrackNatively(context: TrackContext) {
+    try {
+      const queue: NativeMediaQueueItem[] = context.playlist.tracks.map((track) => ({
+        id: track.id,
+        title: track.name,
+        playlist: context.playlist.name,
+        url: resolveNativeStreamUrl(track.streamUrl),
+        sizeBytes: track.sizeBytes,
+      }));
+      playbackBackend = "native";
+      nativePlaybackSupported.value = true;
+      mediaSessionSupported.value = true;
+      volumeSupported.value = false;
+      stopWebAudioForNative();
+      currentTrackId.value = context.track.id;
+      selectedPlaylistId.value = context.playlist.id;
+      currentTime.value = 0;
+      duration.value = 0;
+      preparing.value = true;
+      playerError.value = "";
+      if (!dispatchNativeMedia({
+        action: "play",
+        queue,
+        index: context.index,
+        loop: singleLoop.value,
+      })) {
+        playbackBackend = null;
+        preparing.value = false;
+        playing.value = false;
+        playerError.value = "原生播放服务暂时不可用";
+        return;
+      }
+      playing.value = false;
+    } catch {
+      playbackBackend = null;
+      preparing.value = false;
+      playing.value = false;
+      playerError.value = "音频地址无效，请重新扫描后再试";
     }
+  }
+
+  function resolveNativeStreamUrl(value: string): string {
+    if (typeof window === "undefined") throw new Error("Window is unavailable.");
+    const url = new URL(value, window.location.origin);
+    if (url.protocol !== "https:" || url.origin !== window.location.origin) {
+      throw new Error("Rejected cross-origin media URL.");
+    }
+    return url.href;
+  }
+
+  function stopWebAudioForNative() {
+    if (!audio) return;
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    clearMediaSession();
+  }
+
+  async function resumePlayback() {
     if (!currentTrack.value) {
       const fallbackPlaylist = playlists.value.find((item) => item.id === selectedPlaylistId.value)
         || playlists.value[0];
       const fallback = fallbackPlaylist?.tracks[0];
       if (fallback) await playTrack(fallback.id);
+      return;
+    }
+    if (playbackBackend === "native" || (playbackBackend === null && getNativeMediaBridge())) {
+      nativePlaybackSupported.value = Boolean(getNativeMediaBridge());
+      if (dispatchNativeMedia({ action: "resume" })) playing.value = true;
+      else playerError.value = "原生播放服务暂时不可用";
+      return;
+    }
+    if (isNativeMediaExpected()) {
+      nativePlaybackSupported.value = false;
+      playerError.value = "原生播放服务未就绪，请重新打开应用";
+      return;
+    }
+    const player = ensureAudio();
+    if (!player) {
+      playerError.value = "当前浏览器无法创建音频播放器";
       return;
     }
     try {
@@ -160,22 +274,40 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
   }
 
   function pausePlayback() {
+    if (playbackBackend === "native") {
+      if (dispatchNativeMedia({ action: "pause" })) playing.value = false;
+      return;
+    }
     audio?.pause();
   }
 
   async function playPrevious() {
     const context = currentContext.value;
     if (!context || context.index === 0) return;
+    if (playbackBackend === "native") {
+      dispatchNativeMedia({ action: "previous" });
+      return;
+    }
     await playTrack(context.playlist.tracks[context.index - 1].id);
   }
 
   async function playNext() {
     const context = currentContext.value;
     if (!context || context.index >= context.playlist.tracks.length - 1) return;
+    if (playbackBackend === "native") {
+      dispatchNativeMedia({ action: "next" });
+      return;
+    }
     await playTrack(context.playlist.tracks[context.index + 1].id);
   }
 
   function seek(seconds: number) {
+    if (playbackBackend === "native") {
+      if (Number.isFinite(seconds) && seconds >= 0) {
+        dispatchNativeMedia({ action: "seek", position: seconds });
+      }
+      return;
+    }
     if (!audio || !Number.isFinite(duration.value) || duration.value <= 0) return;
     audio.currentTime = Math.min(Math.max(0, seconds), duration.value);
     syncAudioState();
@@ -184,10 +316,18 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
 
   function toggleLoop() {
     singleLoop.value = !singleLoop.value;
+    if (playbackBackend === "native") {
+      dispatchNativeMedia({ action: "setLoop", loop: singleLoop.value });
+      return;
+    }
     if (audio) audio.loop = singleLoop.value;
   }
 
   function setVolume(value: number) {
+    if (playbackBackend === "native") {
+      volumeSupported.value = false;
+      return;
+    }
     if (!audio || !volumeSupported.value) return;
     const next = Math.min(1, Math.max(0, value));
     try {
@@ -204,18 +344,25 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
       sleepDeadline.value = null;
       sleepRemainingSeconds.value = 0;
       stopTimerLoop();
+      if (playbackBackend === "native") {
+        dispatchNativeMedia({ action: "setSleepTimer", deadline: null });
+      }
       return;
     }
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > 720) {
       throw new Error("定时时长应为 1 到 720 分钟");
     }
     sleepDeadline.value = Date.now() + minutes * 60_000;
+    if (playbackBackend === "native") {
+      dispatchNativeMedia({ action: "setSleepTimer", deadline: sleepDeadline.value });
+    }
     checkSleepTimer();
     startTimerLoop();
   }
 
   function handleResume() {
-    syncAudioState();
+    nativePlaybackSupported.value = Boolean(getNativeMediaBridge());
+    if (playbackBackend !== "native") syncAudioState();
     checkSleepTimer();
   }
 
@@ -227,16 +374,19 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
   }
 
   function disposeCurrentTrack() {
+    if (playbackBackend === "native") dispatchNativeMedia({ action: "stop" });
     if (audio) {
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
     }
+    preparing.value = false;
     currentTrackId.value = "";
     currentTime.value = 0;
     duration.value = 0;
     playing.value = false;
     playerError.value = "";
+    playbackBackend = null;
     clearMediaSession();
   }
 
@@ -250,7 +400,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
   }
 
   function syncAudioState() {
-    if (!audio) return;
+    if (!audio || playbackBackend === "native") return;
     currentTime.value = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
     duration.value = Number.isFinite(audio.duration) ? audio.duration : 0;
     playing.value = !audio.paused && !audio.ended;
@@ -278,6 +428,46 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
     document.addEventListener("visibilitychange", handleResume);
     window.addEventListener("pageshow", handleResume);
     window.addEventListener("focus", handleResume);
+    window.addEventListener(WHITE_NOISE_CACHE_CLEARED_EVENT, disposeCurrentTrack);
+  }
+
+  function bindNativeLifecycle() {
+    if (nativeLifecycleBound || typeof window === "undefined") return;
+    nativeLifecycleBound = true;
+    window.addEventListener("budlog-native-ready", handleNativeReady as EventListener);
+    window.addEventListener("budlog-native-media-state", handleNativeMediaState as EventListener);
+  }
+
+  function handleNativeReady() {
+    nativePlaybackSupported.value = Boolean(getNativeMediaBridge());
+  }
+
+  function handleNativeMediaState(event: CustomEvent<unknown>) {
+    if (!isNativeMediaState(event.detail)) return;
+    const state = event.detail;
+    nativePlaybackSupported.value = true;
+    mediaSessionSupported.value = true;
+    if (state.trackId) playbackBackend = "native";
+    if (playbackBackend !== "native") return;
+
+    preparing.value = state.status === "loading";
+    playing.value = state.status === "playing";
+    currentTime.value = Math.max(0, state.currentTime);
+    duration.value = Math.max(0, state.duration);
+    singleLoop.value = state.loop;
+    playerError.value = state.error;
+    volumeSupported.value = false;
+    sleepDeadline.value = state.sleepDeadline;
+    if (state.trackId) {
+      currentTrackId.value = state.trackId;
+      const context = findTrack(state.trackId);
+      if (context) selectedPlaylistId.value = context.playlist.id;
+    } else if (state.status === "idle") {
+      currentTrackId.value = "";
+      currentTime.value = 0;
+      duration.value = 0;
+    }
+    checkSleepTimer();
   }
 
   function startTimerLoop() {
@@ -389,6 +579,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
     selectedPlaylistId,
     currentTrackId,
     playing,
+    preparing,
     currentTime,
     duration,
     singleLoop,
@@ -398,6 +589,7 @@ export const useWhiteNoisePlayerStore = defineStore("whiteNoisePlayer", () => {
     sleepDeadline,
     sleepRemainingSeconds,
     mediaSessionSupported,
+    nativePlaybackSupported,
     currentTrack,
     currentPlaylist,
     canPrevious,

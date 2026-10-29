@@ -27,10 +27,14 @@ public class AccessController {
         if (!passwordService.matches(password)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        String cookie = passwordService.createMediaSessionCookie(request);
+        String mediaCookie = passwordService.createMediaSessionCookie(request);
+        String widgetCookie = passwordService.createWidgetSessionCookie(request);
         ResponseEntity.HeadersBuilder<?> response = ResponseEntity.noContent();
-        if (cookie != null) {
-            response.header(HttpHeaders.SET_COOKIE, cookie);
+        if (mediaCookie != null) {
+            response.header(HttpHeaders.SET_COOKIE, mediaCookie);
+        }
+        if (widgetCookie != null) {
+            response.header(HttpHeaders.SET_COOKIE, widgetCookie);
         }
         return response.build();
     }
@@ -39,6 +43,7 @@ public class AccessController {
     public ResponseEntity<Void> logout(HttpServletRequest request) {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, passwordService.clearMediaSessionCookie(request))
+                .header(HttpHeaders.SET_COOKIE, passwordService.clearWidgetSessionCookie(request))
                 .build();
     }
 }

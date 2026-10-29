@@ -37,6 +37,11 @@ public class FeedingController {
         return ApiResponse.success(service.list(from, to, page, size));
     }
 
+    @GetMapping("/latest-bottle")
+    public ApiResponse<FeedingResponse> latestBottle() {
+        return ApiResponse.success(service.latestBottle());
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<FeedingResponse> get(@PathVariable Long id) {
         return ApiResponse.success(service.get(id));
@@ -59,4 +64,3 @@ public class FeedingController {
         service.delete(id);
     }
 }
-

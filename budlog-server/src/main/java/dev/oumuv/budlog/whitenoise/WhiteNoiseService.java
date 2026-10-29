@@ -255,8 +255,12 @@ public class WhiteNoiseService {
         String portableRelative = relative.toString().replace(relative.getFileSystem().getSeparator(), "/");
         String originalName = filename.toString();
         String displayName = originalName.substring(0, originalName.length() - 4);
+        String versionedIdentity = portableRelative
+                + ":" + before.size()
+                + ":" + before.lastModifiedTime().toMillis()
+                + ":" + Objects.toString(fileKey);
         return new WhiteNoiseTrackResource(
-                hash(portableRelative),
+                hash(versionedIdentity),
                 displayName,
                 root,
                 relative,

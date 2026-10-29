@@ -1,18 +1,98 @@
 <script setup lang="ts">
 import { onHide, onLaunch, onShow } from "@dcloudio/uni-app";
+import { verifyPassword } from "./api/request";
 import { useWhiteNoisePlayerStore } from "./stores/whiteNoisePlayer";
+import { useTimerStore } from "./stores/timer";
+import { getPassword } from "./utils/auth";
+import { ensureAccess } from "./utils/guard";
+import {
+  consumePendingNativeShortcut,
+  peekPendingNativeShortcut,
+  queueNativeShortcut,
+} from "./utils/nativeShortcuts";
 import { initializePwa } from "./utils/pwa";
+import { checkForH5Update } from "./utils/release";
 import { startReminderLoop, stopReminderLoop } from "./utils/reminders";
+import { isNativeWidgetAvailable, requestNativeWidgetRefresh } from "./utils/nativeWidget";
 
 const whiteNoisePlayer = useWhiteNoisePlayerStore();
+const timerStore = useTimerStore();
+const WIDGET_SESSION_REFRESH_INTERVAL_MS = 60_000;
+
+let shortcutListenerBound = false;
+let nativeReadyListenerBound = false;
+let nativeReadyHandled = false;
+let widgetSessionRefresh: Promise<void> | undefined;
+let widgetSessionPassword = "";
+let widgetSessionAttemptedAt = 0;
+
+async function openPendingShortcut() {
+  if (!peekPendingNativeShortcut() || !(await ensureAccess())) return;
+  const route = consumePendingNativeShortcut();
+  if (route) uni.navigateTo({ url: route });
+}
+
+function handleNativeShortcut(event: Event) {
+  if (!(event instanceof CustomEvent) || !queueNativeShortcut(event.detail)) return;
+  event.preventDefault();
+  void openPendingShortcut();
+}
+
+async function refreshNativeWidgetSession() {
+  if (!isNativeWidgetAvailable()) return;
+  if (widgetSessionRefresh) return widgetSessionRefresh;
+  const password = getPassword();
+  if (!password) {
+    widgetSessionPassword = "";
+    widgetSessionAttemptedAt = 0;
+    return;
+  }
+  const now = Date.now();
+  if (
+    widgetSessionPassword === password
+    && now - widgetSessionAttemptedAt < WIDGET_SESSION_REFRESH_INTERVAL_MS
+  ) return;
+  widgetSessionPassword = password;
+  widgetSessionAttemptedAt = now;
+
+  const refresh = verifyPassword(password)
+    .then(() => {
+      if (getPassword() !== password) return;
+      timerStore.syncNative();
+      requestNativeWidgetRefresh();
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      if (widgetSessionRefresh === refresh) widgetSessionRefresh = undefined;
+    });
+  widgetSessionRefresh = refresh;
+  return refresh;
+}
+
+function handleNativeReady() {
+  if (nativeReadyHandled) return;
+  nativeReadyHandled = true;
+  void refreshNativeWidgetSession();
+}
 
 onLaunch(() => {
   initializePwa();
   whiteNoisePlayer.initialize();
+  if (!shortcutListenerBound && typeof window !== "undefined") {
+    shortcutListenerBound = true;
+    window.addEventListener("budlog-native-shortcut", handleNativeShortcut);
+  }
+  if (!nativeReadyListenerBound && typeof window !== "undefined") {
+    nativeReadyListenerBound = true;
+    window.addEventListener("budlog-native-ready", handleNativeReady);
+  }
 });
 onShow(() => {
+  void checkForH5Update();
   startReminderLoop();
   whiteNoisePlayer.handleResume();
+  void refreshNativeWidgetSession();
+  void openPendingShortcut();
 });
 onHide(() => stopReminderLoop());
 </script>

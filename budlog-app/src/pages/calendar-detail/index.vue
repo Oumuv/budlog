@@ -47,6 +47,7 @@ onUnload(() => { requestId += 1; });
 
 const dateTime = (value?: string) => value ? toLocalInput(value).replace("T", " ") : "未设置";
 const field = (label: string, value: string) => ({ label, value });
+const recurrenceLabels = { ONCE: "单次", DAILY: "每天", WEEKLY: "每周" };
 
 async function load() {
   const current = ++requestId;
@@ -75,9 +76,10 @@ async function fetchDetail(): Promise<Detail> {
       const task = await api.task(id);
       return {
         title: task.title, kind, note: task.description,
-        editUrl: `/pages/task-edit/index?id=${id}`,
+        editUrl: task.nextOccurrenceCreated ? undefined : `/pages/task-edit/index?id=${id}`,
         fields: [
           field("状态", task.overdue ? "待处理 · 已逾期" : taskLabels[task.status]),
+          field("任务类型", recurrenceLabels[task.recurrenceType]),
           field("到期时间", dateTime(task.dueTime)),
           field("提醒时间", dateTime(task.remindTime)),
           ...(task.completedAt ? [field("完成时间", dateTime(task.completedAt))] : []),

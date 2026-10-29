@@ -1,11 +1,12 @@
 import { computed, readonly, ref } from "vue";
+import { runtime } from "./runtime";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
-export type PwaInstallResult = "accepted" | "dismissed" | "installed" | "manual";
+export type PwaInstallResult = "accepted" | "dismissed" | "installed" | "manual" | "unavailable";
 
 const installPrompt = ref<BeforeInstallPromptEvent>();
 const standalone = ref(false);
@@ -33,9 +34,23 @@ async function registerServiceWorker() {
   }
 }
 
+async function unregisterEmbeddedServiceWorkers() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  } catch (error) {
+    console.warn("Budlog embedded Service Worker cleanup failed", error);
+  }
+}
+
 export function initializePwa() {
   if (initialized || typeof window === "undefined") return;
   initialized = true;
+  if (runtime.isAndroidApp) {
+    void unregisterEmbeddedServiceWorkers();
+    return;
+  }
   updateStandalone();
 
   const displayMode = window.matchMedia("(display-mode: standalone)");
@@ -56,6 +71,7 @@ export function initializePwa() {
 }
 
 export async function requestPwaInstall(): Promise<PwaInstallResult> {
+  if (runtime.isAndroidApp) return "unavailable";
   if (detectStandalone()) return "installed";
   const prompt = installPrompt.value;
   if (!prompt) return "manual";

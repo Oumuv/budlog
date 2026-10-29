@@ -61,7 +61,7 @@ public class TaskController {
     @PatchMapping("/{id}/status")
     public ApiResponse<TaskResponse> updateStatus(
             @PathVariable Long id, @Valid @RequestBody TaskStatusRequest request) {
-        return ApiResponse.success(service.updateStatus(id, request.getStatus()));
+        return ApiResponse.success(service.updateStatus(id, request.getStatus(), request.getRecurrenceScope()));
     }
 
     @DeleteMapping("/{id}")
@@ -70,4 +70,3 @@ public class TaskController {
         service.delete(id);
     }
 }
-

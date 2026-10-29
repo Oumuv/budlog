@@ -23,11 +23,16 @@ export async function ensureAccess(): Promise<boolean> {
     verifiedPassword = password;
     return true;
   } catch {
-    clearPassword();
+    await clearPassword();
     verifiedPassword = "";
     redirectToAccess();
     return false;
   }
+}
+
+export function markAccessVerified(password: string): void {
+  verifiedPassword = password;
+  passwordlessAccessVerified = !password;
 }
 
 export function resetAccessVerification(): void {

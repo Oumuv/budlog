@@ -2,6 +2,8 @@ export type FeedingType = "BREAST_DIRECT" | "BREAST_BOTTLE" | "FORMULA_BOTTLE";
 export type BreastSide = "LEFT" | "RIGHT" | "BOTH";
 export type DiaperType = "PEE" | "POOP" | "BOTH";
 export type TaskStatus = "TODO" | "DONE" | "CANCELED";
+export type TaskRecurrenceType = "ONCE" | "DAILY" | "WEEKLY";
+export type TaskRecurrenceScope = "OCCURRENCE" | "SERIES";
 export type EventType = "VACCINE" | "DOCUMENT" | "MOMENT" | "OTHER";
 
 export interface Baby {
@@ -135,6 +137,8 @@ export interface TodoTask {
   description?: string;
   dueTime: string;
   remindTime?: string;
+  recurrenceType: TaskRecurrenceType;
+  nextOccurrenceCreated: boolean;
   status: TaskStatus;
   completedAt?: string;
   overdue: boolean;
@@ -147,6 +151,7 @@ export interface TaskInput {
   description?: string;
   dueTime: string;
   remindTime?: string;
+  recurrenceType: TaskRecurrenceType;
 }
 
 export interface AppSetting {

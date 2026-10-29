@@ -1,0 +1,19 @@
+{
+  "pages": [
+    {
+      "path": "pages/shell/index",
+      "style": {
+        "navigationStyle": "custom",
+        "app-plus": {
+          "bounce": "none"
+        }
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "Budlog",
+    "navigationBarBackgroundColor": "#F7F5F4",
+    "backgroundColor": "#F7F5F4"
+  }
+}

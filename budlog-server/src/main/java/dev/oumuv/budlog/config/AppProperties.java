@@ -8,6 +8,7 @@ public class AppProperties {
     private final Access access = new Access();
     private final Feeding feeding = new Feeding();
     private final WhiteNoise whiteNoise = new WhiteNoise();
+    private final Agent agent = new Agent();
     private String timezone = "Asia/Shanghai";
     private String corsAllowedOrigins = "http://localhost:5173,http://127.0.0.1:5173";
 
@@ -21,6 +22,10 @@ public class AppProperties {
 
     public WhiteNoise getWhiteNoise() {
         return whiteNoise;
+    }
+
+    public Agent getAgent() {
+        return agent;
     }
 
     public String getTimezone() {
@@ -69,6 +74,37 @@ public class AppProperties {
 
         public void setDefaultIntervalMinutes(int defaultIntervalMinutes) {
             this.defaultIntervalMinutes = defaultIntervalMinutes;
+        }
+    }
+
+    public static class Agent {
+        private boolean enabled;
+        private int maxRangeDays = 90;
+        // JSON object of clientId -> SHA-256 hex digest, supplied via protected environment.
+        private String clientsJson = "{}";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getMaxRangeDays() {
+            return maxRangeDays;
+        }
+
+        public void setMaxRangeDays(int maxRangeDays) {
+            this.maxRangeDays = maxRangeDays;
+        }
+
+        public String getClientsJson() {
+            return clientsJson;
+        }
+
+        public void setClientsJson(String clientsJson) {
+            this.clientsJson = clientsJson;
         }
     }
 

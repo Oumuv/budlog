@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CalendarDays, Check, ChevronRight, Download, LogOut, MonitorSmartphone, Pencil, Plus, Save, Trash2, X } from "lucide-vue-next";
+import { CalendarDays, Check, ChevronRight, Download, Info, LogOut, MonitorSmartphone, PanelsTopLeft, Pencil, Plus, Save, Smartphone, Trash2, X } from "lucide-vue-next";
 import { NButton, NInput, NInputNumber, NSwitch } from "naive-ui";
 import { onShow } from "@dcloudio/uni-app";
 import { reactive, ref } from "vue";
@@ -15,6 +15,9 @@ import { clearPassword } from "../../utils/auth";
 import { formatDate, nowLocalInput, setAppTimezone, toIso, toLocalInput, uuid } from "../../utils/date";
 import { ensureAccess, resetAccessVerification } from "../../utils/guard";
 import { pwaInstallAvailable, pwaStandalone, requestPwaInstall } from "../../utils/pwa";
+import { currentRelease } from "../../utils/release";
+import { runtime } from "../../utils/runtime";
+import { isNativeWidgetAvailable, requestPinNativeWidget } from "../../utils/nativeWidget";
 
 const SHANGHAI_TIMEZONE = "Asia/Shanghai";
 const whiteNoisePlayer = useWhiteNoisePlayerStore();
@@ -23,6 +26,7 @@ const loggingOut = ref(false);
 const savingProfile = ref(false);
 const savingSettings = ref(false);
 const error = ref("");
+const widgetAvailable = ref(isNativeWidgetAvailable());
 const configured = ref(false);
 const profileEditing = ref(false);
 const milestones = ref<Milestone[]>([]);
@@ -44,6 +48,7 @@ const intervalPresets = [
 ];
 
 onShow(async () => {
+  widgetAvailable.value = isNativeWidgetAvailable();
   if (await ensureAccess()) await load();
 });
 
@@ -176,7 +181,7 @@ async function logout() {
   try {
     await api.logoutAccessSession();
     whiteNoisePlayer.disposePlayback();
-    clearPassword();
+    await clearPassword();
     resetAccessVerification();
     uni.reLaunch({ url: "/pages/access/index" });
   } catch (exception) {
@@ -205,6 +210,7 @@ function profileBirthText() {
 async function installPwa() {
   try {
     const result = await requestPwaInstall();
+    if (result === "unavailable") return;
     if (result === "accepted") {
       uni.showToast({ title: "安装已开始", icon: "success" });
       return;
@@ -224,6 +230,16 @@ async function installPwa() {
     console.error("Budlog install prompt failed", exception);
     uni.showToast({ title: "暂时无法唤起安装，请通过浏览器菜单添加", icon: "none" });
   }
+}
+
+function addDesktopWidget() {
+  widgetAvailable.value = isNativeWidgetAvailable();
+  if (widgetAvailable.value && requestPinNativeWidget()) return;
+  uni.showModal({
+    title: "桌面组件不可用",
+    content: "当前 Android 安装包不支持此功能，请升级 Budlog 后再试。",
+    showCancel: false,
+  });
 }
 </script>
 
@@ -313,7 +329,20 @@ async function installPwa() {
         <view class="section settings-section utility-section">
           <view class="section-title"><text class="section-title__text">其他</text></view>
           <view class="utility-list surface">
-            <button class="utility-row" @click="installPwa">
+            <view class="utility-row utility-row--static">
+              <view class="utility-row__icon"><Info :size="19" /></view>
+              <view><text>H5 版本</text><small>{{ currentRelease.buildId }}</small></view>
+            </view>
+            <view v-if="runtime.isAndroidApp" class="utility-row utility-row--static">
+              <view class="utility-row__icon"><Smartphone :size="19" /></view>
+              <view><text>Android 壳</text><small>Shell {{ runtime.shellVersion || "未知" }} · Bridge {{ runtime.bridgeVersion || "未知" }}</small></view>
+            </view>
+            <button v-if="runtime.isAndroidApp" class="utility-row" @click="addDesktopWidget">
+              <view class="utility-row__icon utility-row__icon--widget"><PanelsTopLeft :size="19" /></view>
+              <view><text>桌面组件</text><small>{{ widgetAvailable ? "添加 Budlog 今日照护到桌面" : "当前安装包暂不支持" }}</small></view>
+              <ChevronRight :size="17" />
+            </button>
+            <button v-if="!runtime.isAndroidApp" class="utility-row" @click="installPwa">
               <view class="utility-row__icon"><MonitorSmartphone :size="19" /></view>
               <view><text>桌面应用</text><small>{{ pwaStandalone ? "已安装" : pwaInstallAvailable ? "可以安装" : "添加到主屏幕" }}</small></view>
               <view v-if="pwaStandalone" class="utility-row__state"><Check :size="14" />已安装</view>
@@ -388,10 +417,13 @@ async function installPwa() {
 .utility-row { display: grid; width: 100%; min-height: 62px; grid-template-columns: 35px minmax(0, 1fr) auto; align-items: center; gap: 8px; margin: 0; padding: 9px 11px; border-bottom: 1px solid var(--bud-color-line-soft); text-align: left; }
 .utility-row:last-child { border-bottom: 0; }
 .utility-row__icon { display: flex; width: 32px; height: 32px; align-items: center; justify-content: center; border-radius: 7px; color: var(--baby-blue); background: var(--baby-blue-soft); }
+.utility-row > view:nth-child(2) { min-width: 0; }
 .utility-row text, .utility-row small { display: block; }
 .utility-row text { font-size: 11px; font-weight: 750; }
-.utility-row small { margin-top: 2px; color: var(--bud-color-muted); font-size: 9px; }
+.utility-row small { margin-top: 2px; overflow-wrap: anywhere; color: var(--bud-color-muted); font-size: 9px; }
 .utility-row__state { display: flex; align-items: center; gap: 3px; color: var(--baby-green); font-size: 9px; }
+.utility-row__icon--widget { color: var(--baby-green); background: var(--baby-green-soft); }
+.utility-row--static { background: var(--bud-color-surface); }
 .utility-row--logout .utility-row__icon { color: var(--bud-color-primary); background: var(--bud-color-primary-soft); }
 .modal-backdrop { position: fixed; z-index: 50; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 15px; background: rgba(31, 37, 53, 0.48); backdrop-filter: blur(3px); }
 .milestone-modal { width: min(100%, 430px); max-height: 88vh; overflow-y: auto; padding: 17px; }

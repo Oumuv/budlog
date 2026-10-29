@@ -3,10 +3,13 @@ import { NRadioButton, NRadioGroup } from "naive-ui";
 
 type Value = string | number;
 
-defineProps<{
+withDefaults(defineProps<{
   modelValue: Value;
   options: Array<{ label: string; value: Value }>;
-}>();
+  disabled?: boolean;
+}>(), {
+  disabled: false,
+});
 const emit = defineEmits<{ "update:modelValue": [value: Value] }>();
 
 function updateValue(value: Value | null) {
@@ -18,6 +21,7 @@ function updateValue(value: Value | null) {
   <NRadioGroup
     class="segmented-control"
     :value="modelValue"
+    :disabled="disabled"
     size="large"
     @update:value="updateValue"
   >

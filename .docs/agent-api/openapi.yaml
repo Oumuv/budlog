@@ -1,0 +1,333 @@
+openapi: 3.0.3
+info:
+  title: Budlog Agent Read-only REST API
+  version: 1.0.0-draft
+  description: >-
+    Draft aligned with developing Java DTOs and the implementation plan. GET only;
+    not evidence of deployment or MCP/Scheduled Tasks support. See README for caveats.
+servers:
+  - url: https://api.example.invalid
+    description: Placeholder; replace only after HTTPS deployment preflight.
+security:
+  - AgentBearer: []
+tags:
+  - name: Agent
+    description: Read-only, baby-scoped records; never a medical diagnosis.
+paths:
+  /api/v1/agent/v1/profile:
+    get:
+      tags: [Agent]
+      operationId: getAgentProfile
+      summary: Current baby profile
+      responses:
+        '200': {description: Success, content: {application/json: {schema: {$ref: '#/components/schemas/ProfileEnvelope'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/agent/v1/feedings:
+    get:
+      tags: [Agent]
+      operationId: getAgentFeedings
+      summary: Paged feeding records sorted by startTime DESC, id DESC
+      parameters:
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 0, default: 0}
+        - name: size
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+      responses:
+        '200': {description: Success, content: {application/json: {schema: {$ref: '#/components/schemas/FeedingsEnvelope'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/agent/v1/feedings/daily:
+    get:
+      tags: [Agent]
+      operationId: getAgentDailyFeedings
+      summary: Daily feeding statistics for inclusive date range
+      parameters:
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+      responses:
+        '200': {description: Success, content: {application/json: {schema: {$ref: '#/components/schemas/DailyFeedingsEnvelope'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/agent/v1/feedings/trends:
+    get:
+      tags: [Agent]
+      operationId: getAgentFeedingTrends
+      summary: Daily series and preceding equal-length comparison
+      parameters:
+        - name: days
+          in: query
+          schema: {type: integer, enum: [7, 30], default: 7}
+        - name: endDate
+          in: query
+          description: Baby-local last calendar day; defaults to yesterday.
+          schema: {type: string, format: date}
+      responses:
+        '200': {description: Success, content: {application/json: {schema: {$ref: '#/components/schemas/FeedingTrendsEnvelope'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/agent/v1/care/daily:
+    get:
+      tags: [Agent]
+      operationId: getAgentDailyCare
+      summary: Recorded diaper events, added stored milk and latest measured weight
+      parameters:
+        - {$ref: '#/components/parameters/Date'}
+      responses:
+        '200': {description: Success, content: {application/json: {schema: {$ref: '#/components/schemas/CareEnvelope'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/agent/v1/daily-report:
+    get:
+      tags: [Agent]
+      operationId: getAgentDailyReport
+      summary: Single-day snapshot of all Agent data
+      parameters:
+        - {$ref: '#/components/parameters/Date'}
+      responses:
+        '200': {description: Success, content: {application/json: {schema: {$ref: '#/components/schemas/ReportEnvelope'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/Unavailable'}
+  /api/v1/agent/v1/weights/trends:
+    get:
+      tags: [Agent]
+      operationId: getAgentWeightTrends
+      summary: Actual weight measurements and adjacent-point changes
+      parameters:
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+      responses:
+        '200': {description: Success, content: {application/json: {schema: {$ref: '#/components/schemas/WeightTrendsEnvelope'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/Unavailable'}
+components:
+  securitySchemes:
+    AgentBearer:
+      type: http
+      scheme: bearer
+      description: >-
+        Independent read-only token, never X-App-Password. Runtime config:
+        BUDLOG_AGENT_ENABLED=false by default; BUDLOG_AGENT_CLIENTS_JSON is a
+        JSON map clientId -> SHA-256 hex digest (not plaintext token).
+  parameters:
+    From:
+      name: from
+      in: query
+      required: true
+      description: Inclusive baby-local date; range at most 90 calendar days by default.
+      schema: {type: string, format: date}
+    To:
+      name: to
+      in: query
+      required: true
+      description: Inclusive baby-local date; queried up to next midnight exclusive.
+      schema: {type: string, format: date}
+    Date:
+      name: date
+      in: query
+      required: true
+      description: Calendar day in baby's timezone (default Asia/Shanghai).
+      schema: {type: string, format: date}
+  responses:
+    BadRequest:
+      description: Invalid date, range, pagination or parameter.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    Unauthorized:
+      description: Missing or invalid Agent Bearer token.
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+    Unavailable:
+      description: Agent disabled (or resource unavailable).
+      content: {application/json: {schema: {$ref: '#/components/schemas/ErrorEnvelope'}}}
+  schemas:
+    Envelope:
+      type: object
+      required: [code, message, timestamp]
+      properties:
+        code: {type: integer, description: '0 for success'}
+        message: {type: string}
+        timestamp: {type: string, format: date-time, description: UTC response time}
+    ErrorEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/Envelope'}
+        - type: object
+          properties:
+            data: {type: object, nullable: true, additionalProperties: true}
+    ProfileEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/Envelope'}
+        - type: object
+          required: [data]
+          properties: {data: {$ref: '#/components/schemas/Profile'}}
+    FeedingsEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/Envelope'}
+        - type: object
+          required: [data]
+          properties: {data: {$ref: '#/components/schemas/FeedingPage'}}
+    DailyFeedingsEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/Envelope'}
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: array
+              items: {$ref: '#/components/schemas/DailyFeeding'}
+    FeedingTrendsEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/Envelope'}
+        - type: object
+          required: [data]
+          properties: {data: {$ref: '#/components/schemas/FeedingTrends'}}
+    CareEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/Envelope'}
+        - type: object
+          required: [data]
+          properties: {data: {$ref: '#/components/schemas/CareDaily'}}
+    ReportEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/Envelope'}
+        - type: object
+          required: [data]
+          properties: {data: {$ref: '#/components/schemas/DailyReport'}}
+    WeightTrendsEnvelope:
+      allOf:
+        - {$ref: '#/components/schemas/Envelope'}
+        - type: object
+          required: [data]
+          properties: {data: {$ref: '#/components/schemas/WeightTrends'}}
+    Profile:
+      type: object
+      properties:
+        name: {type: string, description: Sensitive baby name}
+        birthTime: {type: string, format: date-time}
+        timezone: {type: string, example: Asia/Shanghai}
+        ageDaysElapsed: {type: integer, format: int64, description: Completed 24-hour periods since birth (clamped at zero).}
+    FeedingRecord:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        feedingType: {type: string, enum: [BREAST_DIRECT, BREAST_BOTTLE, FORMULA_BOTTLE]}
+        breastSide: {type: string, nullable: true, description: Enum values pending verification.}
+        startTime: {type: string, format: date-time}
+        endTime: {type: string, format: date-time, nullable: true}
+        amountMl: {type: number, nullable: true}
+        note: {type: string, nullable: true, description: May contain sensitive text.}
+        durationMinutes: {type: integer, format: int64, nullable: true}
+    FeedingPage:
+      type: object
+      properties:
+        content: {type: array, items: {$ref: '#/components/schemas/FeedingRecord'}}
+        page: {type: integer}
+        size: {type: integer}
+        totalElements: {type: integer, format: int64}
+        totalPages: {type: integer}
+    DailyFeeding:
+      type: object
+      description: >-
+        Same startTime is one session; intervals assigned to the later start date.
+        Breastfeeding duration is not convertible to ml. Unknown values may be null.
+      properties:
+        date: {type: string, format: date}
+        recordCount: {type: integer}
+        sessionCount: {type: integer}
+        breastBottleRecordCount: {type: integer}
+        formulaBottleRecordCount: {type: integer}
+        directFeedingRecordCount: {type: integer}
+        breastBottleMl: {type: number}
+        formulaBottleMl: {type: number}
+        measuredBottleIntakeMl: {type: number, description: Measured bottle milk only; excludes direct feeding and stored milk.}
+        directFeedingMinutes: {type: integer, format: int64, nullable: true}
+        totalIntakeKnown: {type: boolean, description: False when direct feeding exists or any bottle amount is unknown.}
+        measuredBottleIntakeKnown: {type: boolean, description: False if any bottle record has unknown amount.}
+        averageBottleMl: {type: number, nullable: true}
+        averageIntervalMinutes: {type: integer, format: int64, nullable: true}
+        longestRecordedIntervalMinutes: {type: integer, format: int64, nullable: true}
+        lastFeedingAt: {type: string, format: date-time, nullable: true}
+    FeedingTrends:
+      type: object
+      properties:
+        days: {type: integer, enum: [7, 30]}
+        endDate: {type: string, format: date}
+        previousFrom: {type: string, format: date}
+        previousTo: {type: string, format: date}
+        daily: {type: array, items: {$ref: '#/components/schemas/DailyFeeding'}}
+        measuredBottleIntakeMl: {type: number}
+        previousMeasuredBottleIntakeMl: {type: number}
+        measuredBottleChangePercent: {type: number, nullable: true}
+        sessionCount: {type: integer}
+        previousSessionCount: {type: integer}
+        totalIntakeKnown: {type: boolean}
+        previousTotalIntakeKnown: {type: boolean}
+        measuredBottleIntakeKnown: {type: boolean}
+        previousMeasuredBottleIntakeKnown: {type: boolean}
+        comparisonAvailable: {type: boolean}
+    Diaper:
+      type: object
+      description: BOTH increments pee and poop once each; counts are recorded events.
+      properties:
+        peeRecordCount: {type: integer}
+        poopRecordCount: {type: integer}
+        recordCount: {type: integer}
+    MilkStorage:
+      type: object
+      description: Added stored milk, not baby intake or current inventory.
+      properties:
+        addedMl: {type: number}
+        recordCount: {type: integer}
+    LatestWeight:
+      type: object
+      properties:
+        latestKg: {type: number, nullable: true}
+        measuredAt: {type: string, format: date-time, nullable: true}
+        ageOfMeasurementDays: {type: integer, format: int64, nullable: true}
+    CareDaily:
+      type: object
+      properties:
+        date: {type: string, format: date}
+        diaper: {$ref: '#/components/schemas/Diaper'}
+        milkStorage: {$ref: '#/components/schemas/MilkStorage'}
+        weight: {$ref: '#/components/schemas/LatestWeight'}
+    DataQuality:
+      type: object
+      description: Absence of a record does not prove absence of an event.
+      properties:
+        completenessVerified: {type: boolean, example: false}
+        missingRecordCategories: {type: array, items: {type: string}}
+        notes: {type: array, items: {type: string}}
+    DailyReport:
+      type: object
+      properties:
+        date: {type: string, format: date}
+        timezone: {type: string}
+        baby: {$ref: '#/components/schemas/Profile'}
+        feeding: {$ref: '#/components/schemas/DailyFeeding'}
+        diaper: {$ref: '#/components/schemas/Diaper'}
+        milkStorage: {$ref: '#/components/schemas/MilkStorage'}
+        weight: {$ref: '#/components/schemas/LatestWeight'}
+        dataQuality: {$ref: '#/components/schemas/DataQuality'}
+        generatedAt: {type: string, format: date-time}
+    WeightPoint:
+      type: object
+      properties:
+        measuredAt: {type: string, format: date-time}
+        weightKg: {type: number}
+        deltaGrams: {type: number, nullable: true, description: Null for first point.}
+        gramsPerDay: {type: number, nullable: true, description: Null for first point or zero time difference.}
+    WeightTrends:
+      type: object
+      properties:
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        measurements: {type: array, items: {$ref: '#/components/schemas/WeightPoint'}}

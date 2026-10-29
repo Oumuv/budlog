@@ -2,6 +2,8 @@ package dev.oumuv.budlog.access;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.oumuv.budlog.common.ApiResponse;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,6 +18,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE + 11)
 public class AccessPasswordFilter extends OncePerRequestFilter {
 
     private final AccessPasswordService passwordService;
@@ -29,7 +32,8 @@ public class AccessPasswordFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return HttpMethod.OPTIONS.matches(request.getMethod())
+        return path.startsWith("/api/v1/agent/v1/")
+                || HttpMethod.OPTIONS.matches(request.getMethod())
                 || "/api/v1/access/verify".equals(path)
                 || "/api/v1/access/logout".equals(path)
                 || "/actuator/health".equals(path);
@@ -38,8 +42,10 @@ public class AccessPasswordFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        if (passwordService.matches(request.getHeader(AccessPasswordService.HEADER_NAME))
-                || isAuthorizedMediaRequest(request)) {
+        if (!isAgentBearerOnly(request)
+                && (passwordService.matches(request.getHeader(AccessPasswordService.HEADER_NAME))
+                || isAuthorizedMediaRequest(request)
+                || isAuthorizedWidgetRequest(request))) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -48,6 +54,12 @@ public class AccessPasswordFilter extends OncePerRequestFilter {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getWriter(), new ApiResponse<Void>(40100, "家庭访问密码不正确", null));
+    }
+
+    private boolean isAgentBearerOnly(HttpServletRequest request) {
+        String authorization = request.getHeader("Authorization");
+        return authorization != null && authorization.startsWith("Bearer ")
+                && request.getHeader(AccessPasswordService.HEADER_NAME) == null;
     }
 
     private boolean isAuthorizedMediaRequest(HttpServletRequest request) {
@@ -60,6 +72,22 @@ public class AccessPasswordFilter extends OncePerRequestFilter {
         for (javax.servlet.http.Cookie cookie : request.getCookies()) {
             if (AccessPasswordService.MEDIA_COOKIE_NAME.equals(cookie.getName())) {
                 return passwordService.matchesMediaSession(cookie.getValue());
+            }
+        }
+        return false;
+    }
+
+    private boolean isAuthorizedWidgetRequest(HttpServletRequest request) {
+        if (!HttpMethod.GET.matches(request.getMethod())
+                || !"/api/v1/widget/summary".equals(request.getRequestURI())) {
+            return false;
+        }
+        if (request.getCookies() == null) {
+            return false;
+        }
+        for (javax.servlet.http.Cookie cookie : request.getCookies()) {
+            if (AccessPasswordService.WIDGET_COOKIE_NAME.equals(cookie.getName())) {
+                return passwordService.matchesWidgetSession(cookie.getValue());
             }
         }
         return false;

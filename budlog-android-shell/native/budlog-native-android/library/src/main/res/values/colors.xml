@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="budlog_widget_surface">#FFFFFFFF</color>
+    <color name="budlog_widget_border">#1A8B98A8</color>
+    <color name="budlog_widget_text">#FF14213A</color>
+    <color name="budlog_widget_muted">#FF7A879F</color>
+    <color name="budlog_widget_primary">#FFF0447D</color>
+    <color name="budlog_widget_blue">#FF2F80ED</color>
+    <color name="budlog_widget_orange">#FFD17A00</color>
+    <color name="budlog_widget_cyan">#FF0796A8</color>
+    <color name="budlog_widget_green">#FF119A70</color>
+    <color name="budlog_widget_divider">#FFE9EDF3</color>
+    <color name="budlog_widget_timer_bg">#FFFFEFF5</color>
+    <color name="budlog_widget_bottle_bg">#FFEDF5FF</color>
+    <color name="budlog_widget_diaper_bg">#FFE8F8FA</color>
+    <color name="budlog_widget_milk_bg">#FFECF8F1</color>
+    <color name="budlog_widget_task_bg">#FFF0EBFF</color>
+    <color name="budlog_widget_task">#FF6549C9</color>
+</resources>

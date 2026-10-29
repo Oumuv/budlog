@@ -7,6 +7,7 @@ import { api } from "../../api";
 import DateTimeField from "../../components/DateTimeField.vue";
 import AppLoading from "../../components/AppLoading.vue";
 import AppPage from "../../components/AppPage.vue";
+import OptionalNoteField from "../../components/OptionalNoteField.vue";
 import PageHeader from "../../components/PageHeader.vue";
 import SegmentedControl from "../../components/SegmentedControl.vue";
 import type { EventType } from "../../types";
@@ -168,10 +169,11 @@ function remove() {
         <DateTimeField v-model="form.occurredAt" title="选择发生时间" quick-record :max-now-offset-minutes="5" />
       </view>
 
-      <view class="field">
-        <text class="field__label">备注</text>
-        <NInput v-model:value="form.note" type="textarea" :maxlength="1000" :autosize="{ minRows: 3, maxRows: 7 }" placeholder="可选，可记录地点、针次或其他细节" />
-      </view>
+      <OptionalNoteField
+        v-model="form.note"
+        :max-length="1000"
+        placeholder="可记录地点、针次或其他细节"
+      />
 
       <view class="form-actions">
         <NButton v-if="recordId" type="error" size="large" secondary block :loading="deleting" @click="remove"><Trash2 :size="18" />删除</NButton>

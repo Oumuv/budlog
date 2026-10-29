@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Service
@@ -65,6 +66,16 @@ public class FeedingService {
     @Transactional(readOnly = true)
     public FeedingResponse get(Long id) {
         return toResponse(require(id));
+    }
+
+    @Transactional(readOnly = true)
+    public FeedingResponse latestBottle() {
+        BabyProfile baby = babyService.requireCurrent();
+        FeedingRecord record = repository
+                .findFirstByBabyIdAndDeletedAtIsNullAndFeedingTypeInOrderByStartTimeDesc(
+                        baby.getId(), Arrays.asList(FeedingType.BREAST_BOTTLE, FeedingType.FORMULA_BOTTLE))
+                .orElse(null);
+        return record == null ? null : toResponse(record);
     }
 
     @Transactional

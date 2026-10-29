@@ -46,6 +46,17 @@ public class TodoTask extends SoftDeleteEntity {
     private OffsetDateTime remindTime;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "recurrence_type", nullable = false, length = 16)
+    private TaskRecurrenceType recurrenceType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "previous_task_id")
+    private TodoTask previousTask;
+
+    @Column(name = "next_occurrence_created", nullable = false)
+    private boolean nextOccurrenceCreated;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private TaskStatus status;
 
@@ -55,4 +66,3 @@ public class TodoTask extends SoftDeleteEntity {
     @Column(name = "client_request_id", nullable = false, unique = true)
     private UUID clientRequestId;
 }
-

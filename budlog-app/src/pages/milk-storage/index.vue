@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Save, Trash2 } from "lucide-vue-next";
-import { NButton, NInput, NInputNumber } from "naive-ui";
+import { NButton, NInputNumber } from "naive-ui";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { api } from "../../api";
 import DateTimeField from "../../components/DateTimeField.vue";
 import AppLoading from "../../components/AppLoading.vue";
 import AppPage from "../../components/AppPage.vue";
+import OptionalNoteField from "../../components/OptionalNoteField.vue";
 import PageHeader from "../../components/PageHeader.vue";
 import { nowLocalInput, toIso, toLocalInput, uuid } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
@@ -27,14 +28,7 @@ const form = reactive({
   note: "",
 });
 
-const amountPresets = computed(() => {
-  const values = [30, 60, 90, 120, 150, 180];
-  const options = values.map((value) => ({ value, label: String(value) }));
-  if (lastAmount.value && !values.includes(lastAmount.value)) {
-    options.unshift({ value: lastAmount.value, label: `上次 ${lastAmount.value}` });
-  }
-  return options;
-});
+const amountPresets = [60, 90, 120];
 const amountValue = computed<number | null>({
   get: () => form.amountMl === "" ? null : Number(form.amountMl),
   set: (value) => { form.amountMl = value === null ? "" : String(value); },
@@ -185,24 +179,30 @@ function setAmount(amount: number) {
           />
           <text class="amount-stepper__unit">ml</text>
         </view>
-        <view class="amount-presets shortcut-row">
+        <button
+          v-if="lastAmount"
+          class="last-amount-action"
+          :class="{ 'last-amount-action--active': Number(form.amountMl) === lastAmount }"
+          :aria-pressed="Number(form.amountMl) === lastAmount"
+          hover-class="none"
+          @click="setAmount(lastAmount)"
+        >
+          沿用上次 {{ lastAmount }} ml
+        </button>
+        <view v-else class="amount-presets shortcut-row">
           <button
-            v-for="option in amountPresets"
-            :key="option.value"
+            v-for="amount in amountPresets"
+            :key="amount"
             class="shortcut-chip amount-preset"
-            :class="{ 'shortcut-chip--active': Number(form.amountMl) === option.value }"
-            @click="setAmount(option.value)"
+            :class="{ 'shortcut-chip--active': Number(form.amountMl) === amount }"
+            @click="setAmount(amount)"
           >
-            {{ option.label }}
+            {{ amount }}
           </button>
         </view>
-        <text v-if="lastAmount" class="field__hint">上次记录 {{ lastAmount }} ml</text>
       </view>
 
-      <view class="field">
-        <text class="field__label">备注</text>
-        <NInput v-model:value="form.note" type="textarea" :maxlength="500" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="可选" />
-      </view>
+      <OptionalNoteField v-model="form.note" />
 
       <view class="form-actions">
         <NButton v-if="recordId" type="error" size="large" secondary block :loading="deleting" @click="remove"><Trash2 :size="18" />删除</NButton>
@@ -230,6 +230,25 @@ function setAmount(amount: number) {
   min-width: 0;
   padding-right: 8px;
   padding-left: 8px;
+}
+
+.last-amount-action {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  margin: 8px 0 0;
+  padding: 0 12px;
+  border: 1px solid #cfe1fb;
+  border-radius: 8px;
+  color: #246bb8;
+  background: #f2f7ff;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.last-amount-action--active {
+  border-color: #8fb9ef;
+  background: #e8f2ff;
 }
 
 .amount-stepper {

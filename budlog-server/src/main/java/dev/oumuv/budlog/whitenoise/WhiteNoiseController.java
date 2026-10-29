@@ -49,6 +49,11 @@ public class WhiteNoiseController {
         return response.body(ApiResponse.success(service.listPlaylists()));
     }
 
+    @GetMapping("/session")
+    public ResponseEntity<Void> validateMediaSession() {
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/tracks/{id}/stream")
     public ResponseEntity<?> stream(
             @PathVariable String id,

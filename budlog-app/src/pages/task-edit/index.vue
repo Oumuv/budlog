@@ -2,14 +2,15 @@
 import { Save, Trash2 } from "lucide-vue-next";
 import { NButton, NInput, NSwitch } from "naive-ui";
 import { onBackPress, onLoad } from "@dcloudio/uni-app";
-import { nextTick, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { api } from "../../api";
 import AppLoading from "../../components/AppLoading.vue";
 import AppPage from "../../components/AppPage.vue";
 import DateTimeField from "../../components/DateTimeField.vue";
 import PageHeader from "../../components/PageHeader.vue";
 import SegmentedControl from "../../components/SegmentedControl.vue";
-import { shiftDay, toIso, toLocalInput, todayKey, uuid } from "../../utils/date";
+import type { TaskRecurrenceType } from "../../types";
+import { formatDuration, shiftDay, toIso, toLocalInput, todayKey, uuid } from "../../utils/date";
 import { ensureAccess } from "../../utils/guard";
 import { clearShownReminder } from "../../utils/reminders";
 
@@ -19,6 +20,7 @@ const taskId = ref<number>();
 const loading = ref(false);
 const saving = ref(false);
 const dirty = ref(false);
+const readOnly = ref(false);
 let hydrating = true;
 
 const form = reactive({
@@ -28,6 +30,7 @@ const form = reactive({
   dueTime: dueDefault,
   remindTime: remindDefault,
   hasReminder: true,
+  recurrenceType: "ONCE" as TaskRecurrenceType,
 });
 type DuePreset = "30M" | "1H" | "TONIGHT" | "TOMORROW" | "";
 type ReminderLead = "10" | "30" | "60" | "CUSTOM";
@@ -45,6 +48,29 @@ const reminderOptions = [
   { value: "60", label: "1小时" },
   { value: "CUSTOM", label: "自定义" },
 ];
+const recurrenceOptions: Array<{ value: TaskRecurrenceType; label: string }> = [
+  { value: "ONCE", label: "单次" },
+  { value: "DAILY", label: "每天" },
+  { value: "WEEKLY", label: "每周" },
+];
+const weekdayLabels = ["日", "一", "二", "三", "四", "五", "六"];
+const dueTimeLabel = computed(() => (form.recurrenceType === "ONCE" ? "到期时间" : "首次到期时间"));
+const customReminderLabel = computed(() => (form.recurrenceType === "ONCE" ? "提醒时间" : "首次提醒时间"));
+const recurrenceSummary = computed(() => {
+  if (form.recurrenceType === "ONCE") return "";
+  const schedule = recurrenceSchedule(form.dueTime);
+  return schedule ? `后续安排：${schedule}` : "";
+});
+const reminderRecurrenceSummary = computed(() => {
+  if (form.recurrenceType === "ONCE" || !form.hasReminder) return "";
+  if (reminderLead.value !== "CUSTOM") {
+    return `后续每次均提前 ${formatDuration(Number(reminderLead.value))}提醒`;
+  }
+  const schedule = recurrenceSchedule(form.remindTime);
+  const leadMinutes = customReminderLeadMinutes();
+  if (!schedule || leadMinutes === undefined) return "";
+  return `后续提醒：${schedule}（每次提前 ${formatDuration(leadMinutes)}）`;
+});
 
 watch(form, () => {
   if (!hydrating) dirty.value = true;
@@ -64,6 +90,8 @@ onLoad(async (options) => {
       form.dueTime = toLocalInput(task.dueTime);
       form.remindTime = toLocalInput(task.remindTime || task.dueTime);
       form.hasReminder = Boolean(task.remindTime);
+      form.recurrenceType = task.recurrenceType || "ONCE";
+      readOnly.value = task.nextOccurrenceCreated;
       reminderLead.value = inferReminderLead();
     } catch (exception) {
       uni.showToast({ title: exception instanceof Error ? exception.message : "加载失败", icon: "none" });
@@ -92,6 +120,7 @@ onBackPress(() => {
 });
 
 async function save() {
+  if (readOnly.value) return;
   if (!form.title.trim()) {
     uni.showToast({ title: "请输入任务标题", icon: "none" });
     return;
@@ -108,6 +137,7 @@ async function save() {
       description: form.description.trim() || undefined,
       dueTime: toIso(form.dueTime),
       remindTime: form.hasReminder ? toIso(form.remindTime) : undefined,
+      recurrenceType: form.recurrenceType,
     };
     if (taskId.value) await api.updateTask(taskId.value, payload);
     else await api.createTask(payload);
@@ -183,6 +213,27 @@ function inferReminderLead(): ReminderLead {
   }
 }
 
+function recurrenceSchedule(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return "";
+  const [, year, month, day, hour, minute] = match;
+  const time = `${hour}:${minute}`;
+  if (form.recurrenceType === "DAILY") return `每天 ${time}`;
+  const weekday = weekdayLabels[new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).getUTCDay()];
+  return `每周${weekday} ${time}`;
+}
+
+function customReminderLeadMinutes(): number | undefined {
+  try {
+    const dueInstant = new Date(toIso(form.dueTime)).getTime();
+    const remindInstant = new Date(toIso(form.remindTime)).getTime();
+    const difference = Math.round((dueInstant - remindInstant) / 60_000);
+    return difference >= 0 ? difference : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 watch(() => form.dueTime, syncReminderFromDue);
 watch(reminderLead, syncReminderFromDue);
 watch(() => form.hasReminder, (enabled) => {
@@ -193,21 +244,26 @@ watch(() => form.hasReminder, (enabled) => {
 <template>
   <AppPage>
     <view class="page-shell page-shell--form task-edit-page">
-    <PageHeader :title="taskId ? '编辑任务' : '新增任务'" back />
+    <PageHeader :title="readOnly ? '任务详情' : taskId ? '编辑任务' : '新增任务'" back />
     <AppLoading v-if="loading" copy="正在加载任务" />
     <view v-else class="task-form surface">
       <view class="field">
         <text class="field__label">标题</text>
-        <NInput v-model:value="form.title" clearable :maxlength="100" placeholder="任务标题" />
+        <NInput v-model:value="form.title" clearable :disabled="readOnly" :maxlength="100" placeholder="任务标题" />
       </view>
       <view class="field">
         <text class="field__label">说明</text>
-        <NInput v-model:value="form.description" type="textarea" :maxlength="1000" :autosize="{ minRows: 3, maxRows: 7 }" placeholder="可选" />
+        <NInput v-model:value="form.description" type="textarea" :disabled="readOnly" :maxlength="1000" :autosize="{ minRows: 3, maxRows: 7 }" placeholder="可选" />
       </view>
       <view class="field">
-        <text class="field__label">到期时间</text>
-        <DateTimeField :model-value="form.dueTime" title="选择到期时间" @update:model-value="updateDueTime" />
-        <view class="shortcut-row due-shortcuts">
+        <text class="field__label">任务类型</text>
+        <SegmentedControl v-model="form.recurrenceType" :disabled="readOnly" :options="recurrenceOptions" />
+      </view>
+      <view class="field">
+        <text class="field__label">{{ dueTimeLabel }}</text>
+        <DateTimeField :model-value="form.dueTime" :disabled="readOnly" :title="`选择${dueTimeLabel}`" @update:model-value="updateDueTime" />
+        <text v-if="recurrenceSummary" class="recurrence-summary">{{ recurrenceSummary }}</text>
+        <view v-if="!readOnly" class="shortcut-row due-shortcuts">
           <button
             v-for="option in duePresetOptions"
             :key="option.value"
@@ -224,16 +280,20 @@ watch(() => form.hasReminder, (enabled) => {
           <text class="reminder-toggle__title">到期提醒</text>
           <text class="reminder-toggle__copy">在到期前提醒家庭成员</text>
         </view>
-        <NSwitch v-model:value="form.hasReminder" />
+        <NSwitch v-model:value="form.hasReminder" :disabled="readOnly" />
       </view>
       <view v-if="form.hasReminder" class="field">
         <text class="field__label">提前提醒</text>
-        <SegmentedControl v-model="reminderLead" class="reminder-segmented" :options="reminderOptions" />
-        <DateTimeField v-if="reminderLead === 'CUSTOM'" v-model="form.remindTime" title="选择提醒时间" />
+        <SegmentedControl v-model="reminderLead" class="reminder-segmented" :disabled="readOnly" :options="reminderOptions" />
+        <template v-if="reminderLead === 'CUSTOM'">
+          <text class="field__sub-label">{{ customReminderLabel }}</text>
+          <DateTimeField v-model="form.remindTime" :disabled="readOnly" :title="`选择${customReminderLabel}`" />
+        </template>
+        <text v-if="reminderRecurrenceSummary" class="recurrence-summary">{{ reminderRecurrenceSummary }}</text>
       </view>
       <view class="form-actions">
         <NButton v-if="taskId" type="error" size="large" secondary block @click="remove"><Trash2 :size="18" />删除</NButton>
-        <NButton type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : "保存" }}</NButton>
+        <NButton v-if="!readOnly" type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : "保存" }}</NButton>
       </view>
     </view>
     </view>
@@ -243,6 +303,22 @@ watch(() => form.hasReminder, (enabled) => {
 <style scoped>
 .task-form {
   padding: 16px;
+}
+
+.recurrence-summary {
+  display: block;
+  margin-top: 6px;
+  color: var(--bud-color-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.field__sub-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--bud-color-body);
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .reminder-toggle {

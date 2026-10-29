@@ -1,0 +1,5 @@
+export type InitializeNative = (allowedOrigin: string) => boolean
+export type DispatchNative = (commandJson: string) => string
+export type DispatchNativeWidget = (commandJson: string) => string
+export type GetNativeState = () => string
+export type ConsumeShortcutRoute = () => string

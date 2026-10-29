@@ -1,3 +1,7 @@
+import { useTimerStore } from "../stores/timer";
+import { clearWhiteNoiseCaches } from "./whiteNoiseCache";
+import { clearNativeWidgetData } from "./nativeWidget";
+
 const STORAGE_KEY = "budlog.access.password";
 
 let sessionPassword = "";
@@ -6,15 +10,24 @@ export function getPassword(): string {
   return sessionPassword || String(uni.getStorageSync(STORAGE_KEY) || "");
 }
 
-export function setPassword(password: string, remember: boolean): void {
+export async function setPassword(password: string, remember: boolean): Promise<void> {
+  const previous = getPassword();
+  if (previous && previous !== password) {
+    useTimerStore().clear();
+    clearNativeWidgetData();
+    await clearWhiteNoiseCaches();
+  }
   sessionPassword = password;
   if (remember) uni.setStorageSync(STORAGE_KEY, password);
   else uni.removeStorageSync(STORAGE_KEY);
 }
 
-export function clearPassword(): void {
+export async function clearPassword(): Promise<void> {
+  useTimerStore().clear();
+  clearNativeWidgetData();
   sessionPassword = "";
   uni.removeStorageSync(STORAGE_KEY);
+  await clearWhiteNoiseCaches();
 }
 
 export function redirectToAccess(): void {
