@@ -1,19 +1,14 @@
 package dev.oumuv.budlog.weight;
 
-import dev.oumuv.budlog.baby.BabyProfile;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import dev.oumuv.budlog.common.SoftDeleteEntity;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -21,31 +16,28 @@ import java.util.UUID;
 
 @Getter
 @Setter
-@Entity
-@Table(name = "weight_record")
+@TableName(value = "weight_record", autoResultMap = true)
 public class WeightRecord extends SoftDeleteEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "baby_id", nullable = false)
-    private BabyProfile baby;
+    @TableField("baby_id")
+    private Long babyId;
 
-    @Column(name = "measured_at", nullable = false)
+    @TableField("measured_at")
     private OffsetDateTime measuredAt;
 
-    @Column(name = "record_date", nullable = false)
+    @TableField("record_date")
     private LocalDate recordDate;
 
-    @Column(name = "weight_kg", nullable = false, precision = 6, scale = 3)
+    @TableField("weight_kg")
     private BigDecimal weightKg;
 
-    @Column(length = 500)
+    @TableField(updateStrategy = FieldStrategy.IGNORED)
     private String note;
 
-    @Column(name = "client_request_id", nullable = false, unique = true)
+    @TableField("client_request_id")
     private UUID clientRequestId;
 }
 

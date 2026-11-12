@@ -1,36 +1,24 @@
 package dev.oumuv.budlog.common;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.persistence.Column;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.PrePersist;
-import javax.persistence.PreUpdate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 
 @Getter
 @Setter
-@MappedSuperclass
 public abstract class AuditedEntity {
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    public abstract Long getId();
+
+    @TableField(value = "created_at", fill = FieldFill.INSERT, updateStrategy = FieldStrategy.NEVER)
     private OffsetDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private OffsetDateTime updatedAt;
 
-    @PrePersist
-    protected void beforeInsert() {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        createdAt = now;
-        updatedAt = now;
-    }
-
-    @PreUpdate
-    protected void beforeUpdate() {
-        updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
-    }
 }
 

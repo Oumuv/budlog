@@ -13,18 +13,19 @@ import dev.oumuv.budlog.milestone.MilestoneResponse;
 import dev.oumuv.budlog.milestone.MilestoneService;
 import dev.oumuv.budlog.setting.SettingResponse;
 import dev.oumuv.budlog.setting.SettingService;
+import dev.oumuv.budlog.summary.SummaryService;
 import dev.oumuv.budlog.task.TaskResponse;
 import dev.oumuv.budlog.task.TaskService;
 import dev.oumuv.budlog.task.TaskStatus;
 import dev.oumuv.budlog.timeline.TimelineItemResponse;
-import dev.oumuv.budlog.timeline.TimelineResponse;
 import dev.oumuv.budlog.timeline.TimelineService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -37,6 +38,7 @@ public class DashboardService {
     private final DiaperService diaperService;
     private final TaskService taskService;
     private final TimelineService timelineService;
+    private final SummaryService summaryService;
     private final SettingService settingService;
     private final TimeService timeService;
 
@@ -47,6 +49,7 @@ public class DashboardService {
             DiaperService diaperService,
             TaskService taskService,
             TimelineService timelineService,
+            SummaryService summaryService,
             SettingService settingService,
             TimeService timeService) {
         this.babyService = babyService;
@@ -55,10 +58,12 @@ public class DashboardService {
         this.diaperService = diaperService;
         this.taskService = taskService;
         this.timelineService = timelineService;
+        this.summaryService = summaryService;
         this.settingService = settingService;
         this.timeService = timeService;
     }
 
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public DashboardResponse get(LocalDate requestedDate) {
         SettingResponse settings = settingService.get();
         BabyProfile baby = babyService.findCurrent().orElse(null);
@@ -75,8 +80,9 @@ public class DashboardService {
         }
 
         LocalDate date = requestedDate == null ? timeService.today(baby.getTimezone()) : requestedDate;
-        TimelineResponse timeline = timelineService.get(date);
-        List<MilestoneResponse> milestones = milestoneService.list();
+        List<TimelineItemResponse> recent = timelineService.recent(baby, date, 8);
+        DailySummaryResponse summary = summaryService.daily(baby, date);
+        List<MilestoneResponse> milestones = milestoneService.list(baby);
         MilestoneResponse next = null;
         for (MilestoneResponse milestone : milestones) {
             if (milestone.getDaysDifference() >= 0) {
@@ -91,14 +97,7 @@ public class DashboardService {
         DiaperRecord poop = diaperService.lastPoop(baby.getId());
         OffsetDateTime now = timeService.now();
 
-        List<TaskResponse> openTasks = taskService.list(TaskStatus.TODO, null, null);
-        if (openTasks.size() > 6) {
-            openTasks = new ArrayList<TaskResponse>(openTasks.subList(0, 6));
-        }
-        List<TimelineItemResponse> recent = timeline.getItems();
-        if (recent.size() > 8) {
-            recent = new ArrayList<TimelineItemResponse>(recent.subList(0, 8));
-        }
+        List<TaskResponse> openTasks = taskService.listForBaby(baby.getId(), TaskStatus.TODO, null, null, 6);
 
         return DashboardResponse.builder()
                 .configured(true)
@@ -116,7 +115,7 @@ public class DashboardService {
                 .lastPeeMinutesAgo(minutesAgo(pee == null ? null : pee.getRecordTime(), now))
                 .lastPoop(diaperService.toResponse(poop))
                 .lastPoopMinutesAgo(minutesAgo(poop == null ? null : poop.getRecordTime(), now))
-                .todaySummary(timeline.getSummary())
+                .todaySummary(summary)
                 .tasks(openTasks)
                 .recentTimeline(recent)
                 .settings(settings)

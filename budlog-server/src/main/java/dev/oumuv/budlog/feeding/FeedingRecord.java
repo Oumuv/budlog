@@ -1,60 +1,48 @@
 package dev.oumuv.budlog.feeding;
 
-import dev.oumuv.budlog.baby.BabyProfile;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import dev.oumuv.budlog.common.SoftDeleteEntity;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Getter
 @Setter
-@Entity
-@Table(name = "feeding_record")
+@TableName(value = "feeding_record", autoResultMap = true)
 public class FeedingRecord extends SoftDeleteEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "baby_id", nullable = false)
-    private BabyProfile baby;
+    @TableField("baby_id")
+    private Long babyId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "feeding_type", nullable = false, length = 32)
+    @TableField("feeding_type")
     private FeedingType feedingType;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "breast_side", length = 16)
+    @TableField(value = "breast_side", updateStrategy = FieldStrategy.IGNORED)
     private BreastSide breastSide;
 
-    @Column(name = "start_time", nullable = false)
+    @TableField("start_time")
     private OffsetDateTime startTime;
 
-    @Column(name = "end_time")
+    @TableField(value = "end_time", updateStrategy = FieldStrategy.IGNORED)
     private OffsetDateTime endTime;
 
-    @Column(name = "amount_ml", precision = 6, scale = 1)
+    @TableField(value = "amount_ml", updateStrategy = FieldStrategy.IGNORED)
     private BigDecimal amountMl;
 
-    @Column(length = 500)
+    @TableField(updateStrategy = FieldStrategy.IGNORED)
     private String note;
 
-    @Column(name = "client_request_id", nullable = false, unique = true)
+    @TableField("client_request_id")
     private UUID clientRequestId;
 }
 

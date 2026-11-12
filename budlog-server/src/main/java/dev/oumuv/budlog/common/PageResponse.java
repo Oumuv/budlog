@@ -1,7 +1,5 @@
 package dev.oumuv.budlog.common;
 
-import org.springframework.data.domain.Page;
-
 import java.util.List;
 
 public class PageResponse<T> {
@@ -20,7 +18,7 @@ public class PageResponse<T> {
         this.totalPages = totalPages;
     }
 
-    public static <S, T> PageResponse<T> from(Page<S> page, List<T> content) {
+    public static <S, T> PageResponse<T> from(RecordPage<S> page, List<T> content) {
         return new PageResponse<T>(content, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
 

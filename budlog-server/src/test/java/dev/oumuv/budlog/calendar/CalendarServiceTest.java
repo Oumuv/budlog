@@ -84,7 +84,7 @@ class CalendarServiceTest {
         CalendarResponse result = service.get(LocalDate.parse("2026-03-01"), LocalDate.parse("2026-04-12"));
         OffsetDateTime start = OffsetDateTime.parse("2026-03-01T00:00:00-05:00");
         OffsetDateTime end = OffsetDateTime.parse("2026-04-12T00:00:00-04:00");
-        verify(tasks).list(null, start, end);
+        verify(tasks).listForBaby(1L, null, start, end, null);
         verify(events).recordsBetween(1L, start, end);
         verify(feedings).recordsBetween(1L, start, end);
         verify(diapers).recordsBetween(1L, start, end);
@@ -103,7 +103,7 @@ class CalendarServiceTest {
                     .completedAt(OffsetDateTime.parse("2026-09-10T10:00:00Z"))
                     .overdue(status == TaskStatus.TODO).build());
         }
-        when(tasks.list(isNull(), any(), any())).thenReturn(records);
+        when(tasks.listForBaby(eq(1L), isNull(), any(), any(), isNull())).thenReturn(records);
         List<CalendarItemResponse> result = service.get(from, to).getItems();
         assertThat(result).hasSize(3).allMatch(item -> item.getDate().equals(LocalDate.parse("2026-09-09")));
         assertThat(result).extracting(CalendarItemResponse::getRecordType).containsExactlyInAnyOrder("TODO", "DONE", "CANCELED");
@@ -112,7 +112,7 @@ class CalendarServiceTest {
 
     @Test
     void filtersMilestonesAtRangeBoundariesAndKeepsSystemAndCustomIdentities() {
-        when(milestones.list()).thenReturn(Arrays.asList(
+        when(milestones.listBetween(eq(baby), any(), any())).thenReturn(Arrays.asList(
                 milestone(null, "FULL_MONTH", "2026-09-01T00:00:00+08:00"),
                 milestone(null, "DAY_100", "2026-09-30T23:59:00+08:00"),
                 milestone(1L, "CUSTOM", "2026-09-09T08:00:00+08:00"),

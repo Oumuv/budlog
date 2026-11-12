@@ -15,8 +15,8 @@ import dev.oumuv.budlog.milkstorage.MilkStorageRecord;
 import dev.oumuv.budlog.milkstorage.MilkStorageRepository;
 import dev.oumuv.budlog.weight.WeightRecord;
 import dev.oumuv.budlog.weight.WeightRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import dev.oumuv.budlog.common.RecordPage;
+import dev.oumuv.budlog.common.PageSpec;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,9 +79,9 @@ public class AgentReadService {
         validateRange(from, to);
         validatePage(page, size);
         ZoneId zone = zone(baby);
-        Page<FeedingRecord> result = feedings
+        RecordPage<FeedingRecord> result = feedings
                 .findAllByBabyIdAndDeletedAtIsNullAndStartTimeGreaterThanEqualAndStartTimeLessThanOrderByStartTimeDescIdDesc(
-                        baby.getId(), start(from, zone), endExclusive(to, zone), PageRequest.of(page, size));
+                        baby.getId(), start(from, zone), endExclusive(to, zone), PageSpec.of(page, size));
         List<AgentFeedingRecordResponse> content = new ArrayList<AgentFeedingRecordResponse>();
         for (FeedingRecord record : result.getContent()) {
             content.add(new AgentFeedingRecordResponse(record));

@@ -1,45 +1,55 @@
 package dev.oumuv.budlog.feeding;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
+import dev.oumuv.budlog.common.RecordMapper;
+import dev.oumuv.budlog.common.RecordPage;
+import dev.oumuv.budlog.common.PageSpec;
+import org.apache.ibatis.annotations.Mapper;
 
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface FeedingRepository extends JpaRepository<FeedingRecord, Long> {
+@Mapper
+public interface FeedingRepository extends RecordMapper<FeedingRecord> {
 
-    Optional<FeedingRecord> findByIdAndDeletedAtIsNull(Long id);
+    default Optional<FeedingRecord> findFirstByBabyIdAndDeletedAtIsNullOrderByStartTimeDesc(Long babyId) {
+        return Optional.ofNullable(selectOne(live(babyId).orderByDesc("start_time").last("LIMIT 1")));
+    }
 
-    Optional<FeedingRecord> findByClientRequestId(UUID clientRequestId);
+    default Optional<FeedingRecord> findFirstByBabyIdAndDeletedAtIsNullAndFeedingTypeInOrderByStartTimeDesc(Long babyId, List<FeedingType> feedingTypes) {
+        return Optional.ofNullable(selectOne(live(babyId).in("feeding_type", feedingTypes).orderByDesc("start_time").last("LIMIT 1")));
+    }
 
-    Optional<FeedingRecord> findFirstByBabyIdAndDeletedAtIsNullOrderByStartTimeDesc(Long babyId);
+    default Optional<FeedingRecord> findFirstByBabyIdAndDeletedAtIsNullAndStartTimeLessThanOrderByStartTimeDesc(Long babyId, OffsetDateTime startTime) {
+        return Optional.ofNullable(selectOne(live(babyId).lt("start_time", startTime).orderByDesc("start_time").last("LIMIT 1")));
+    }
 
-    Optional<FeedingRecord> findFirstByBabyIdAndDeletedAtIsNullAndFeedingTypeInOrderByStartTimeDesc(
-            Long babyId, List<FeedingType> feedingTypes);
+    default Optional<FeedingRecord> findFirstByBabyIdAndDeletedAtIsNullAndStartTimeLessThanOrderByStartTimeDescIdDesc(Long babyId, OffsetDateTime startTime) {
+        return Optional.ofNullable(selectOne(live(babyId).lt("start_time", startTime).orderByDesc("start_time").orderByDesc("id").last("LIMIT 1")));
+    }
 
-    Optional<FeedingRecord> findFirstByBabyIdAndDeletedAtIsNullAndStartTimeLessThanOrderByStartTimeDesc(
-            Long babyId, OffsetDateTime startTime);
+    default RecordPage<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullOrderByStartTimeDesc(Long babyId, PageSpec pageable) {
+        return page(live(babyId).orderByDesc("start_time"), pageable.getPage(), pageable.getSize());
+    }
 
-    Optional<FeedingRecord> findFirstByBabyIdAndDeletedAtIsNullAndStartTimeLessThanOrderByStartTimeDescIdDesc(
-            Long babyId, OffsetDateTime startTime);
+    default RecordPage<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullAndStartTimeGreaterThanEqualOrderByStartTimeDesc(Long babyId, OffsetDateTime from, PageSpec pageable) {
+        return page(live(babyId).ge("start_time", from).orderByDesc("start_time"), pageable.getPage(), pageable.getSize());
+    }
 
-    Page<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullOrderByStartTimeDesc(Long babyId, Pageable pageable);
+    default RecordPage<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullAndStartTimeLessThanOrderByStartTimeDesc(Long babyId, OffsetDateTime to, PageSpec pageable) {
+        return page(live(babyId).lt("start_time", to).orderByDesc("start_time"), pageable.getPage(), pageable.getSize());
+    }
 
-    Page<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullAndStartTimeGreaterThanEqualOrderByStartTimeDesc(
-            Long babyId, OffsetDateTime from, Pageable pageable);
+    default RecordPage<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullAndStartTimeGreaterThanEqualAndStartTimeLessThanOrderByStartTimeDesc(Long babyId, OffsetDateTime from, OffsetDateTime to, PageSpec pageable) {
+        return page(live(babyId).ge("start_time", from).lt("start_time", to).orderByDesc("start_time"), pageable.getPage(), pageable.getSize());
+    }
 
-    Page<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullAndStartTimeLessThanOrderByStartTimeDesc(
-            Long babyId, OffsetDateTime to, Pageable pageable);
+    default List<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullAndStartTimeGreaterThanEqualAndStartTimeLessThanOrderByStartTimeDesc(Long babyId, OffsetDateTime from, OffsetDateTime to) {
+        return selectList(live(babyId).ge("start_time", from).lt("start_time", to).orderByDesc("start_time"));
+    }
 
-    Page<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullAndStartTimeGreaterThanEqualAndStartTimeLessThanOrderByStartTimeDesc(
-            Long babyId, OffsetDateTime from, OffsetDateTime to, Pageable pageable);
-
-    List<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullAndStartTimeGreaterThanEqualAndStartTimeLessThanOrderByStartTimeDesc(
-            Long babyId, OffsetDateTime from, OffsetDateTime to);
-
-    Page<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullAndStartTimeGreaterThanEqualAndStartTimeLessThanOrderByStartTimeDescIdDesc(
-            Long babyId, OffsetDateTime from, OffsetDateTime to, Pageable pageable);
+    default RecordPage<FeedingRecord> findAllByBabyIdAndDeletedAtIsNullAndStartTimeGreaterThanEqualAndStartTimeLessThanOrderByStartTimeDescIdDesc(Long babyId, OffsetDateTime from, OffsetDateTime to, PageSpec pageable) {
+        return page(live(babyId).ge("start_time", from).lt("start_time", to).orderByDesc("start_time").orderByDesc("id"), pageable.getPage(), pageable.getSize());
+    }
 }

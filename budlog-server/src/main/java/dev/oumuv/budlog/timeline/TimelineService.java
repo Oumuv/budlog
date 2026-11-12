@@ -41,6 +41,7 @@ public class TimelineService {
     private final WeightService weightService;
     private final EventService eventService;
     private final TimeService timeService;
+    private final RecentTimelineMapper recentMapper;
 
     public TimelineService(
             BabyService babyService,
@@ -50,7 +51,8 @@ public class TimelineService {
             TaskService taskService,
             WeightService weightService,
             EventService eventService,
-            TimeService timeService) {
+            TimeService timeService,
+            RecentTimelineMapper recentMapper) {
         this.babyService = babyService;
         this.feedingService = feedingService;
         this.diaperService = diaperService;
@@ -59,10 +61,14 @@ public class TimelineService {
         this.weightService = weightService;
         this.eventService = eventService;
         this.timeService = timeService;
+        this.recentMapper = recentMapper;
     }
 
     public TimelineResponse get(LocalDate date) {
-        BabyProfile baby = babyService.requireCurrent();
+        return get(babyService.requireCurrent(), date);
+    }
+
+    public TimelineResponse get(BabyProfile baby, LocalDate date) {
         LocalDate resolvedDate = date == null ? timeService.today(baby.getTimezone()) : date;
         TimeRange range = timeService.day(resolvedDate, baby.getTimezone());
         List<FeedingRecord> feedings = feedingService.recordsBetween(baby.getId(), range.getStart(), range.getEnd());
@@ -111,14 +117,7 @@ public class TimelineService {
             items.add(milkStorageItem(record));
         }
         for (TodoTask task : tasks) {
-            items.add(TimelineItemResponse.builder()
-                    .id(task.getId())
-                    .category("TASK")
-                    .recordType("DONE")
-                    .eventTime(task.getCompletedAt())
-                    .title("完成任务")
-                    .subtitle(task.getTitle())
-                    .build());
+            items.add(taskItem(task));
         }
         for (WeightRecord record : weights) {
             items.add(weightItem(record));
@@ -130,12 +129,77 @@ public class TimelineService {
         return new TimelineResponse(resolvedDate, summary(feedings, diapers, milkStorages, weights, events), items);
     }
 
-    private DailySummaryResponse summary(
-            List<FeedingRecord> feedings,
-            List<DiaperRecord> diapers,
-            List<MilkStorageRecord> milkStorages,
-            List<WeightRecord> weights,
-            List<EventRecord> events) {
+    /** At most eight candidates per category; the full timeline and its summary remain independent. */
+    public List<TimelineItemResponse> recent(BabyProfile baby, LocalDate date, int limit) {
+        if (limit < 1 || limit > 8) {
+            throw new IllegalArgumentException("Recent timeline limit must be between 1 and 8");
+        }
+        LocalDate resolvedDate = date == null ? timeService.today(baby.getTimezone()) : date;
+        TimeRange range = timeService.day(resolvedDate, baby.getTimezone());
+        List<FeedingRecord> feedings = recentMapper.selectFeedings(
+                baby.getId(), range.getStart(), range.getEnd(), limit);
+        List<DiaperRecord> diapers = recentMapper.selectDiapers(
+                baby.getId(), range.getStart(), range.getEnd(), limit);
+
+        // Match get(): insert feeding/diaper time groups ascending, then stable-sort all items descending.
+        // SQL uses id DESC within a time group; the old repositories did not define that tie-break.
+        feedings.sort(Comparator.comparing(FeedingRecord::getStartTime));
+        diapers.sort(Comparator.comparing(DiaperRecord::getRecordTime));
+        List<TimelineItemResponse> items = new ArrayList<TimelineItemResponse>();
+        for (FeedingRecord record : feedings) {
+            items.add(feedingItem(record, null));
+        }
+        for (DiaperRecord record : diapers) {
+            items.add(diaperItem(record, null));
+        }
+        for (MilkStorageRecord record : recentMapper.selectMilkStorages(
+                baby.getId(), range.getStart(), range.getEnd(), limit)) {
+            items.add(milkStorageItem(record));
+        }
+        for (TodoTask task : recentMapper.selectTasks(baby.getId(), range.getStart(), range.getEnd(), limit)) {
+            items.add(taskItem(task));
+        }
+        for (WeightRecord record : recentMapper.selectWeights(baby.getId(), range.getStart(), range.getEnd(), limit)) {
+            items.add(weightItem(record));
+        }
+        for (EventRecord record : recentMapper.selectEvents(baby.getId(), range.getStart(), range.getEnd(), limit)) {
+            items.add(eventItem(record));
+        }
+        // Stable sorting preserves category insertion order for equal event times.
+        items.sort(Comparator.comparing(TimelineItemResponse::getEventTime).reversed());
+        List<TimelineItemResponse> recent = new ArrayList<TimelineItemResponse>(
+                items.subList(0, Math.min(limit, items.size())));
+        for (int index = 0; index < recent.size(); index++) {
+            TimelineItemResponse item = recent.get(index);
+            OffsetDateTime previousTime;
+            if ("FEEDING".equals(item.getCategory())) {
+                FeedingRecord previous = feedingService.latestBefore(baby.getId(), item.getEventTime());
+                previousTime = previous == null ? null : previous.getStartTime();
+            } else if ("DIAPER".equals(item.getCategory())) {
+                DiaperRecord previous = diaperService.latestBefore(baby.getId(), item.getEventTime());
+                previousTime = previous == null ? null : previous.getRecordTime();
+            } else {
+                continue;
+            }
+            // Query only retained items (at most eight), strictly before their entire time group.
+            // The predecessor may be outside today's range or beyond the candidate limit.
+            recent.set(index, TimelineItemResponse.builder()
+                    .id(item.getId())
+                    .category(item.getCategory())
+                    .recordType(item.getRecordType())
+                    .eventTime(item.getEventTime())
+                    .title(item.getTitle())
+                    .subtitle(item.getSubtitle())
+                    .minutesSincePrevious(minutesBetween(previousTime, item.getEventTime()))
+                    .build());
+        }
+        return recent;
+    }
+
+    // Reuse the exact records already loaded for the timeline, including during concurrent writes.
+    private DailySummaryResponse summary(List<FeedingRecord> feedings, List<DiaperRecord> diapers,
+                                         List<MilkStorageRecord> milkStorages, List<WeightRecord> weights,
+                                         List<EventRecord> events) {
         BigDecimal bottleAmount = BigDecimal.ZERO;
         BigDecimal storedMilkAmount = BigDecimal.ZERO;
         long directMinutes = 0;
@@ -153,23 +217,12 @@ public class TimelineService {
         int pee = 0;
         int poop = 0;
         for (DiaperRecord record : diapers) {
-            if (record.getRecordType() == DiaperType.PEE || record.getRecordType() == DiaperType.BOTH) {
-                pee++;
-            }
-            if (record.getRecordType() == DiaperType.POOP || record.getRecordType() == DiaperType.BOTH) {
-                poop++;
-            }
+            if (record.getRecordType() == DiaperType.PEE || record.getRecordType() == DiaperType.BOTH) pee++;
+            if (record.getRecordType() == DiaperType.POOP || record.getRecordType() == DiaperType.BOTH) poop++;
         }
-        return new DailySummaryResponse(
-                feedings.size(),
-                bottleAmount,
-                directMinutes,
-                milkStorages.size(),
-                storedMilkAmount,
-                pee,
-                poop,
-                weights.isEmpty() ? null : weights.get(0).getWeightKg(),
-                events.size());
+        return new DailySummaryResponse(feedings.size(), bottleAmount, directMinutes,
+                milkStorages.size(), storedMilkAmount, pee, poop,
+                weights.isEmpty() ? null : weights.get(0).getWeightKg(), events.size());
     }
 
     private TimelineItemResponse feedingItem(FeedingRecord record, Long minutesSincePrevious) {
@@ -225,6 +278,17 @@ public class TimelineService {
                 .eventTime(record.getStoredAt())
                 .title("存奶")
                 .subtitle(record.getAmountMl().stripTrailingZeros().toPlainString() + " ml")
+                .build();
+    }
+
+    private TimelineItemResponse taskItem(TodoTask task) {
+        return TimelineItemResponse.builder()
+                .id(task.getId())
+                .category("TASK")
+                .recordType("DONE")
+                .eventTime(task.getCompletedAt())
+                .title("完成任务")
+                .subtitle(task.getTitle())
                 .build();
     }
 

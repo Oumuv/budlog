@@ -1,18 +1,17 @@
 package dev.oumuv.budlog.common;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.persistence.Column;
-import javax.persistence.MappedSuperclass;
 import java.time.OffsetDateTime;
 
 @Getter
 @Setter
-@MappedSuperclass
 public abstract class SoftDeleteEntity extends AuditedEntity {
 
-    @Column(name = "deleted_at")
+    @TableField(value = "deleted_at", updateStrategy = FieldStrategy.IGNORED)
     private OffsetDateTime deletedAt;
 }
 

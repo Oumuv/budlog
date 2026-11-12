@@ -5,9 +5,9 @@ import dev.oumuv.budlog.baby.BabyService;
 import dev.oumuv.budlog.common.BusinessException;
 import dev.oumuv.budlog.common.PageResponse;
 import dev.oumuv.budlog.common.TimeService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import dev.oumuv.budlog.common.RecordPage;
+import dev.oumuv.budlog.common.PageSpec;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,8 +37,8 @@ public class WeightService {
     public PageResponse<WeightResponse> list(LocalDate from, LocalDate to, int page, int size) {
         BabyProfile baby = babyService.requireCurrent();
         validateRangeAndPage(from, to, page, size);
-        Pageable pageable = PageRequest.of(page, Math.min(size, 100));
-        Page<WeightRecord> records;
+        PageSpec pageable = PageSpec.of(page, Math.min(size, 100));
+        RecordPage<WeightRecord> records;
         if (from != null && to != null) {
             records = repository.findAllByBabyIdAndDeletedAtIsNullAndRecordDateGreaterThanEqualAndRecordDateLessThanOrderByRecordDateDescMeasuredAtDesc(
                     baby.getId(), from, to, pageable);
@@ -72,7 +72,7 @@ public class WeightService {
         }
         BabyProfile baby = babyService.requireCurrent();
         WeightRecord record = new WeightRecord();
-        record.setBaby(baby);
+        record.setBabyId(baby.getId());
         record.setClientRequestId(request.getClientRequestId());
         apply(record, request, baby);
         return toResponse(repository.save(record));
@@ -81,7 +81,7 @@ public class WeightService {
     @Transactional
     public WeightResponse update(Long id, WeightRequest request) {
         WeightRecord record = require(id);
-        apply(record, request, record.getBaby());
+        apply(record, request, babyService.requireCurrent());
         return toResponse(repository.save(record));
     }
 
