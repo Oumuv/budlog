@@ -1,37 +1,32 @@
 package dev.oumuv.budlog.baby;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import dev.oumuv.budlog.common.AuditedEntity;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
 import java.time.OffsetDateTime;
 
 @Getter
 @Setter
-@Entity
-@Table(name = "baby_profile")
+@TableName(value = "baby_profile", autoResultMap = true)
 public class BabyProfile extends AuditedEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @Column(nullable = false, length = 50)
     private String name;
 
-    @Column(name = "birth_time", nullable = false)
+    @TableField("birth_time")
     private OffsetDateTime birthTime;
 
-    @Column(nullable = false, length = 64)
     private String timezone;
 
-    @Column(length = 500)
+    @TableField(updateStrategy = FieldStrategy.IGNORED)
     private String note;
 }
 

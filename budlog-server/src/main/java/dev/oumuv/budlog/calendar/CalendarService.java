@@ -58,11 +58,11 @@ public class CalendarService {
         List<CalendarItemResponse> items = new ArrayList<CalendarItemResponse>();
 
         // Tasks appear once, on their scheduled due date, regardless of completion date/status.
-        for (TaskResponse task : taskService.list(null, start, end)) {
+        for (TaskResponse task : taskService.listForBaby(baby.getId(), null, start, end, null)) {
             items.add(item("TASK", task.getId(), task.getStatus().name(), task.getDueTime(), task.getTitle(), zone)
                     .overdue(task.isOverdue()).build());
         }
-        for (MilestoneResponse milestone : milestoneService.list()) {
+        for (MilestoneResponse milestone : milestoneService.listBetween(baby, start, end)) {
             if (milestone.getTargetTime().isBefore(start) || !milestone.getTargetTime().isBefore(end)) continue;
             items.add(item("MILESTONE", milestone.getId(), milestone.getCode(), milestone.getTargetTime(),
                     milestone.getTitle(), zone).build());

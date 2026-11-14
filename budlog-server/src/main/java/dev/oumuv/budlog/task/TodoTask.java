@@ -1,68 +1,53 @@
 package dev.oumuv.budlog.task;
 
-import dev.oumuv.budlog.baby.BabyProfile;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import dev.oumuv.budlog.common.SoftDeleteEntity;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Getter
 @Setter
-@Entity
-@Table(name = "todo_task")
+@TableName(value = "todo_task", autoResultMap = true)
 public class TodoTask extends SoftDeleteEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "baby_id", nullable = false)
-    private BabyProfile baby;
+    @TableField("baby_id")
+    private Long babyId;
 
-    @Column(nullable = false, length = 100)
     private String title;
 
-    @Column(length = 1000)
+    @TableField(updateStrategy = FieldStrategy.IGNORED)
     private String description;
 
-    @Column(name = "due_time", nullable = false)
+    @TableField("due_time")
     private OffsetDateTime dueTime;
 
-    @Column(name = "remind_time")
+    @TableField(value = "remind_time", updateStrategy = FieldStrategy.IGNORED)
     private OffsetDateTime remindTime;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "recurrence_type", nullable = false, length = 16)
+    @TableField("recurrence_type")
     private TaskRecurrenceType recurrenceType;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "previous_task_id")
-    private TodoTask previousTask;
+    @TableField(value = "previous_task_id", updateStrategy = FieldStrategy.IGNORED)
+    private Long previousTaskId;
 
-    @Column(name = "next_occurrence_created", nullable = false)
+    @TableField("next_occurrence_created")
     private boolean nextOccurrenceCreated;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 16)
     private TaskStatus status;
 
-    @Column(name = "completed_at")
+    @TableField(value = "completed_at", updateStrategy = FieldStrategy.IGNORED)
     private OffsetDateTime completedAt;
 
-    @Column(name = "client_request_id", nullable = false, unique = true)
+    @TableField("client_request_id")
     private UUID clientRequestId;
 }

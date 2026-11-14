@@ -1,31 +1,41 @@
 package dev.oumuv.budlog.task;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import dev.oumuv.budlog.common.RecordMapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import org.apache.ibatis.annotations.Mapper;
 
-import javax.persistence.LockModeType;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface TaskRepository extends JpaRepository<TodoTask, Long> {
+@Mapper
+public interface TaskRepository extends RecordMapper<TodoTask> {
+    default Optional<TodoTask> findByIdAndDeletedAtIsNullForUpdate(Long id) {
+        return Optional.ofNullable(selectOne(new QueryWrapper<TodoTask>()
+                .eq("id", id).isNull("deleted_at").last("FOR UPDATE")));
+    }
 
-    Optional<TodoTask> findByIdAndDeletedAtIsNull(Long id);
+    default List<TodoTask> findFiltered(Long babyId, TaskStatus status,
+                                       OffsetDateTime from, OffsetDateTime to, Integer limit) {
+        QueryWrapper<TodoTask> query = between(babyId, "due_time", from, to);
+        if (status != null) query.eq("status", status.name());
+        query.orderByAsc("due_time", "id");
+        if (limit != null) {
+            if (limit < 1 || limit > 100) throw new IllegalArgumentException("Task limit must be between 1 and 100");
+            query.last("LIMIT " + limit);
+        }
+        return selectList(query);
+    }
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select task from TodoTask task where task.id = :id and task.deletedAt is null")
-    Optional<TodoTask> findByIdAndDeletedAtIsNullForUpdate(@Param("id") Long id);
+    default List<TodoTask> findAllByBabyIdAndDeletedAtIsNullAndStatusAndRemindTimeIsNotNullAndRemindTimeLessThanEqualOrderByRemindTimeAsc(
+            Long babyId, TaskStatus status, OffsetDateTime now) {
+        return selectList(live(babyId).eq("status", status.name()).isNotNull("remind_time")
+                .le("remind_time", now).orderByAsc("remind_time"));
+    }
 
-    Optional<TodoTask> findByClientRequestId(UUID clientRequestId);
-
-    List<TodoTask> findAllByBabyIdAndDeletedAtIsNullOrderByDueTimeAsc(Long babyId);
-
-    List<TodoTask> findAllByBabyIdAndDeletedAtIsNullAndStatusAndRemindTimeIsNotNullAndRemindTimeLessThanEqualOrderByRemindTimeAsc(
-            Long babyId, TaskStatus status, OffsetDateTime now);
-
-    List<TodoTask> findAllByBabyIdAndDeletedAtIsNullAndStatusAndCompletedAtGreaterThanEqualAndCompletedAtLessThanOrderByCompletedAtDesc(
-            Long babyId, TaskStatus status, OffsetDateTime from, OffsetDateTime to);
+    default List<TodoTask> findAllByBabyIdAndDeletedAtIsNullAndStatusAndCompletedAtGreaterThanEqualAndCompletedAtLessThanOrderByCompletedAtDesc(
+            Long babyId, TaskStatus status, OffsetDateTime from, OffsetDateTime to) {
+        return selectList(between(babyId, "completed_at", from, to)
+                .eq("status", status.name()).orderByDesc("completed_at"));
+    }
 }

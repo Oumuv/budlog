@@ -31,10 +31,29 @@ public class MilestoneService {
 
     @Transactional(readOnly = true)
     public List<MilestoneResponse> list() {
-        BabyProfile baby = babyService.requireCurrent();
+        return list(babyService.requireCurrent());
+    }
+
+    @Transactional(readOnly = true)
+    public List<MilestoneResponse> list(BabyProfile baby) {
         List<MilestoneResponse> result = new ArrayList<MilestoneResponse>(systemMilestones(baby));
         for (CustomMilestone milestone : repository.findAllByBabyIdAndDeletedAtIsNullOrderByTargetTimeAsc(baby.getId())) {
-            result.add(toResponse(milestone));
+            result.add(toResponse(milestone, baby));
+        }
+        result.sort(Comparator.comparing(MilestoneResponse::getTargetTime));
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public List<MilestoneResponse> listBetween(BabyProfile baby, OffsetDateTime from, OffsetDateTime to) {
+        List<MilestoneResponse> result = new ArrayList<MilestoneResponse>();
+        for (MilestoneResponse milestone : systemMilestones(baby)) {
+            if (!milestone.getTargetTime().isBefore(from) && milestone.getTargetTime().isBefore(to)) {
+                result.add(milestone);
+            }
+        }
+        for (CustomMilestone milestone : repository.findBetween(baby.getId(), from, to)) {
+            result.add(toResponse(milestone, baby));
         }
         result.sort(Comparator.comparing(MilestoneResponse::getTargetTime));
         return result;
@@ -42,23 +61,24 @@ public class MilestoneService {
 
     @Transactional
     public MilestoneResponse create(MilestoneRequest request) {
+        BabyProfile baby = babyService.requireCurrent();
         CustomMilestone duplicate = repository.findByClientRequestId(request.getClientRequestId()).orElse(null);
         if (duplicate != null) {
-            return toResponse(duplicate);
+            return toResponse(duplicate, baby);
         }
 
         CustomMilestone milestone = new CustomMilestone();
-        milestone.setBaby(babyService.requireCurrent());
+        milestone.setBabyId(baby.getId());
         milestone.setClientRequestId(request.getClientRequestId());
         apply(milestone, request);
-        return toResponse(repository.save(milestone));
+        return toResponse(repository.save(milestone), baby);
     }
 
     @Transactional
     public MilestoneResponse update(Long id, MilestoneRequest request) {
         CustomMilestone milestone = require(id);
         apply(milestone, request);
-        return toResponse(repository.save(milestone));
+        return toResponse(repository.save(milestone), babyService.requireCurrent());
     }
 
     @Transactional
@@ -89,8 +109,8 @@ public class MilestoneService {
                 .build();
     }
 
-    private MilestoneResponse toResponse(CustomMilestone milestone) {
-        ZoneId zone = timeService.zone(milestone.getBaby().getTimezone());
+    private MilestoneResponse toResponse(CustomMilestone milestone, BabyProfile baby) {
+        ZoneId zone = timeService.zone(baby.getTimezone());
         return MilestoneResponse.builder()
                 .id(milestone.getId())
                 .code("CUSTOM")

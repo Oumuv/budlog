@@ -1,39 +1,43 @@
 package dev.oumuv.budlog.weight;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
+import dev.oumuv.budlog.common.RecordMapper;
+import dev.oumuv.budlog.common.RecordPage;
+import dev.oumuv.budlog.common.PageSpec;
+import org.apache.ibatis.annotations.Mapper;
 
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface WeightRepository extends JpaRepository<WeightRecord, Long> {
+@Mapper
+public interface WeightRepository extends RecordMapper<WeightRecord> {
 
-    Optional<WeightRecord> findByIdAndDeletedAtIsNull(Long id);
+    default Optional<WeightRecord> findByBabyIdAndRecordDateAndDeletedAtIsNull(Long babyId, LocalDate recordDate) {
+        return Optional.ofNullable(selectOne(live(babyId).eq("record_date", recordDate)));
+    }
 
-    Optional<WeightRecord> findByClientRequestId(UUID clientRequestId);
+    default Optional<WeightRecord> findFirstByBabyIdAndDeletedAtIsNullAndMeasuredAtLessThanOrderByMeasuredAtDescIdDesc(Long babyId, OffsetDateTime before) {
+        return Optional.ofNullable(selectOne(live(babyId).lt("measured_at", before).orderByDesc("measured_at").orderByDesc("id").last("LIMIT 1")));
+    }
 
-    Optional<WeightRecord> findByBabyIdAndRecordDateAndDeletedAtIsNull(Long babyId, LocalDate recordDate);
+    default RecordPage<WeightRecord> findAllByBabyIdAndDeletedAtIsNullOrderByRecordDateDescMeasuredAtDesc(Long babyId, PageSpec pageable) {
+        return page(live(babyId).orderByDesc("record_date", "measured_at"), pageable.getPage(), pageable.getSize());
+    }
 
-    Optional<WeightRecord> findFirstByBabyIdAndDeletedAtIsNullAndMeasuredAtLessThanOrderByMeasuredAtDescIdDesc(
-            Long babyId, OffsetDateTime before);
+    default RecordPage<WeightRecord> findAllByBabyIdAndDeletedAtIsNullAndRecordDateGreaterThanEqualOrderByRecordDateDescMeasuredAtDesc(Long babyId, LocalDate from, PageSpec pageable) {
+        return page(live(babyId).ge("record_date", from).orderByDesc("record_date", "measured_at"), pageable.getPage(), pageable.getSize());
+    }
 
-    Page<WeightRecord> findAllByBabyIdAndDeletedAtIsNullOrderByRecordDateDescMeasuredAtDesc(
-            Long babyId, Pageable pageable);
+    default RecordPage<WeightRecord> findAllByBabyIdAndDeletedAtIsNullAndRecordDateLessThanOrderByRecordDateDescMeasuredAtDesc(Long babyId, LocalDate to, PageSpec pageable) {
+        return page(live(babyId).lt("record_date", to).orderByDesc("record_date", "measured_at"), pageable.getPage(), pageable.getSize());
+    }
 
-    Page<WeightRecord> findAllByBabyIdAndDeletedAtIsNullAndRecordDateGreaterThanEqualOrderByRecordDateDescMeasuredAtDesc(
-            Long babyId, LocalDate from, Pageable pageable);
+    default RecordPage<WeightRecord> findAllByBabyIdAndDeletedAtIsNullAndRecordDateGreaterThanEqualAndRecordDateLessThanOrderByRecordDateDescMeasuredAtDesc(Long babyId, LocalDate from, LocalDate to, PageSpec pageable) {
+        return page(live(babyId).ge("record_date", from).lt("record_date", to).orderByDesc("record_date", "measured_at"), pageable.getPage(), pageable.getSize());
+    }
 
-    Page<WeightRecord> findAllByBabyIdAndDeletedAtIsNullAndRecordDateLessThanOrderByRecordDateDescMeasuredAtDesc(
-            Long babyId, LocalDate to, Pageable pageable);
-
-    Page<WeightRecord> findAllByBabyIdAndDeletedAtIsNullAndRecordDateGreaterThanEqualAndRecordDateLessThanOrderByRecordDateDescMeasuredAtDesc(
-            Long babyId, LocalDate from, LocalDate to, Pageable pageable);
-
-    List<WeightRecord> findAllByBabyIdAndDeletedAtIsNullAndMeasuredAtGreaterThanEqualAndMeasuredAtLessThanOrderByMeasuredAtDesc(
-            Long babyId, OffsetDateTime from, OffsetDateTime to);
+    default List<WeightRecord> findAllByBabyIdAndDeletedAtIsNullAndMeasuredAtGreaterThanEqualAndMeasuredAtLessThanOrderByMeasuredAtDesc(Long babyId, OffsetDateTime from, OffsetDateTime to) {
+        return selectList(live(babyId).ge("measured_at", from).lt("measured_at", to).orderByDesc("measured_at"));
+    }
 }
-

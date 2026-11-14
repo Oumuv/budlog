@@ -1,45 +1,71 @@
 package dev.oumuv.budlog.widget;
 
+import dev.oumuv.budlog.baby.BabyProfile;
+import dev.oumuv.budlog.baby.BabyService;
 import dev.oumuv.budlog.common.TimeService;
-import dev.oumuv.budlog.dashboard.DailySummaryResponse;
-import dev.oumuv.budlog.dashboard.DashboardResponse;
-import dev.oumuv.budlog.dashboard.DashboardService;
+import dev.oumuv.budlog.diaper.DiaperRecord;
+import dev.oumuv.budlog.diaper.DiaperService;
+import dev.oumuv.budlog.feeding.FeedingRecord;
+import dev.oumuv.budlog.feeding.FeedingService;
+import dev.oumuv.budlog.setting.SettingService;
+import dev.oumuv.budlog.summary.SummaryService;
+import dev.oumuv.budlog.summary.SummaryTotals;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 
 @Service
 public class WidgetService {
 
-    private final DashboardService dashboardService;
+    private final BabyService babyService;
+    private final FeedingService feedingService;
+    private final DiaperService diaperService;
+    private final SettingService settingService;
+    private final SummaryService summaryService;
     private final TimeService timeService;
 
-    public WidgetService(DashboardService dashboardService, TimeService timeService) {
-        this.dashboardService = dashboardService;
+    public WidgetService(BabyService babyService, FeedingService feedingService, DiaperService diaperService,
+                         SettingService settingService, SummaryService summaryService, TimeService timeService) {
+        this.babyService = babyService;
+        this.feedingService = feedingService;
+        this.diaperService = diaperService;
+        this.settingService = settingService;
+        this.summaryService = summaryService;
         this.timeService = timeService;
     }
 
     public WidgetSummaryResponse getSummary() {
-        DashboardResponse dashboard = dashboardService.get(null);
-        DailySummaryResponse summary = dashboard.getTodaySummary();
+        BabyProfile baby = babyService.findCurrent().orElse(null);
+        SummaryTotals summary = new SummaryTotals();
+        FeedingRecord feeding = null;
+        DiaperRecord pee = null;
+        DiaperRecord poop = null;
+        OffsetDateTime nextFeeding = null;
+        if (baby != null) {
+            summary = summaryService.widget(baby, null);
+            feeding = feedingService.latest(baby.getId());
+            pee = diaperService.lastPee(baby.getId());
+            poop = diaperService.lastPoop(baby.getId());
+            if (feeding != null) {
+                nextFeeding = feeding.getStartTime().plusMinutes(settingService.get().getDefaultFeedingIntervalMin());
+            }
+        }
 
         return WidgetSummaryResponse.builder()
                 .generatedAt(timeService.now())
-                .configured(dashboard.isConfigured())
-                .babyName(dashboard.getBaby() == null ? null : dashboard.getBaby().getName())
-                .lastFeedingTime(dashboard.getLastFeeding() == null
-                        ? null
-                        : dashboard.getLastFeeding().getStartTime())
-                .nextExpectedFeedingTime(dashboard.getNextExpectedFeedingTime())
-                .lastPeeTime(dashboard.getLastPee() == null ? null : dashboard.getLastPee().getRecordTime())
-                .lastPoopTime(dashboard.getLastPoop() == null ? null : dashboard.getLastPoop().getRecordTime())
+                .configured(baby != null)
+                .babyName(baby == null ? null : baby.getName())
+                .lastFeedingTime(feeding == null ? null : feeding.getStartTime())
+                .nextExpectedFeedingTime(nextFeeding)
+                .lastPeeTime(pee == null ? null : pee.getRecordTime())
+                .lastPoopTime(poop == null ? null : poop.getRecordTime())
                 .today(WidgetSummaryResponse.Today.builder()
-                        .feedingCount(summary == null ? 0 : summary.getFeedingCount())
-                        .bottleAmountMl(summary == null ? BigDecimal.ZERO : summary.getBottleAmountMl())
-                        .peeCount(summary == null ? 0 : summary.getPeeCount())
-                        .poopCount(summary == null ? 0 : summary.getPoopCount())
-                        .milkStorageCount(summary == null ? 0 : summary.getMilkStorageCount())
-                        .storedMilkAmountMl(summary == null ? BigDecimal.ZERO : summary.getStoredMilkAmountMl())
+                        .feedingCount(summary.getFeedingCount())
+                        .bottleAmountMl(summary.getBottleAmountMl())
+                        .peeCount(summary.getPeeCount())
+                        .poopCount(summary.getPoopCount())
+                        .milkStorageCount(summary.getMilkStorageCount())
+                        .storedMilkAmountMl(summary.getStoredMilkAmountMl())
                         .build())
                 .build();
     }

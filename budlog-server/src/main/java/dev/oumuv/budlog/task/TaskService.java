@@ -31,18 +31,14 @@ public class TaskService {
 
     @Transactional(readOnly = true)
     public List<TaskResponse> list(TaskStatus status, OffsetDateTime from, OffsetDateTime to) {
-        BabyProfile baby = babyService.requireCurrent();
+        return listForBaby(babyService.requireCurrent().getId(), status, from, to, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponse> listForBaby(Long babyId, TaskStatus status,
+                                          OffsetDateTime from, OffsetDateTime to, Integer limit) {
         List<TaskResponse> result = new ArrayList<TaskResponse>();
-        for (TodoTask task : repository.findAllByBabyIdAndDeletedAtIsNullOrderByDueTimeAsc(baby.getId())) {
-            if (status != null && task.getStatus() != status) {
-                continue;
-            }
-            if (from != null && task.getDueTime().isBefore(from)) {
-                continue;
-            }
-            if (to != null && !task.getDueTime().isBefore(to)) {
-                continue;
-            }
+        for (TodoTask task : repository.findFiltered(babyId, status, from, to, limit)) {
             result.add(toResponse(task));
         }
         return result;
@@ -60,7 +56,7 @@ public class TaskService {
             return toResponse(duplicate);
         }
         TodoTask task = new TodoTask();
-        task.setBaby(babyService.requireCurrent());
+        task.setBabyId(babyService.requireCurrent().getId());
         task.setClientRequestId(request.getClientRequestId());
         task.setRecurrenceType(TaskRecurrenceType.ONCE);
         task.setStatus(TaskStatus.TODO);
@@ -167,7 +163,7 @@ public class TaskService {
     private void createNextOccurrence(TodoTask current, OffsetDateTime now) {
         OffsetDateTime nextDueTime = nextDueTime(current, now);
         TodoTask next = new TodoTask();
-        next.setBaby(current.getBaby());
+        next.setBabyId(current.getBabyId());
         next.setTitle(current.getTitle());
         next.setDescription(current.getDescription());
         next.setDueTime(nextDueTime);
@@ -176,7 +172,7 @@ public class TaskService {
             next.setRemindTime(nextDueTime.minus(reminderLead));
         }
         next.setRecurrenceType(current.getRecurrenceType());
-        next.setPreviousTask(current);
+        next.setPreviousTaskId(current.getId());
         next.setNextOccurrenceCreated(false);
         next.setStatus(TaskStatus.TODO);
         next.setClientRequestId(UUID.randomUUID());
@@ -185,7 +181,7 @@ public class TaskService {
     }
 
     private OffsetDateTime nextDueTime(TodoTask task, OffsetDateTime now) {
-        ZoneId zone = timeService.zone(task.getBaby().getTimezone());
+        ZoneId zone = timeService.zone(babyService.requireCurrent().getTimezone());
         ZonedDateTime anchor = task.getDueTime().atZoneSameInstant(zone);
         ZonedDateTime current = now.atZoneSameInstant(zone);
         long periodDays = task.getRecurrenceType() == TaskRecurrenceType.DAILY ? 1L : 7L;

@@ -1,17 +1,18 @@
 package dev.oumuv.budlog.milestone;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import dev.oumuv.budlog.common.RecordMapper;
+import org.apache.ibatis.annotations.Mapper;
 
+import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
-public interface MilestoneRepository extends JpaRepository<CustomMilestone, Long> {
+@Mapper
+public interface MilestoneRepository extends RecordMapper<CustomMilestone> {
+    default List<CustomMilestone> findAllByBabyIdAndDeletedAtIsNullOrderByTargetTimeAsc(Long babyId) {
+        return selectList(live(babyId).orderByAsc("target_time"));
+    }
 
-    List<CustomMilestone> findAllByBabyIdAndDeletedAtIsNullOrderByTargetTimeAsc(Long babyId);
-
-    Optional<CustomMilestone> findByIdAndDeletedAtIsNull(Long id);
-
-    Optional<CustomMilestone> findByClientRequestId(UUID clientRequestId);
+    default List<CustomMilestone> findBetween(Long babyId, OffsetDateTime from, OffsetDateTime to) {
+        return selectList(between(babyId, "target_time", from, to).orderByAsc("target_time"));
+    }
 }
-

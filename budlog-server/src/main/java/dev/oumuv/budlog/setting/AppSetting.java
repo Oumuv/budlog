@@ -1,43 +1,36 @@
 package dev.oumuv.budlog.setting;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.PreUpdate;
-import javax.persistence.Table;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 
 @Getter
 @Setter
-@Entity
-@Table(name = "app_setting")
+@TableName(value = "app_setting", autoResultMap = true)
 public class AppSetting {
 
-    @Id
+    @TableId(type = IdType.INPUT)
     private Short id;
 
-    @Column(name = "default_feeding_interval_min", nullable = false)
+    @TableField("default_feeding_interval_min")
     private Integer defaultFeedingIntervalMin;
 
-    @Column(name = "feeding_interval_anchor", nullable = false, length = 16)
+    @TableField("feeding_interval_anchor")
     private String feedingIntervalAnchor;
 
-    @Column(name = "reminder_sound_enabled", nullable = false)
+    @TableField("reminder_sound_enabled")
     private Boolean reminderSoundEnabled;
 
-    @Column(name = "reminder_vibrate_enabled", nullable = false)
+    @TableField("reminder_vibrate_enabled")
     private Boolean reminderVibrateEnabled;
 
-    @Column(name = "updated_at", nullable = false)
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private OffsetDateTime updatedAt;
-
-    @PreUpdate
-    public void beforeUpdate() {
-        updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
-    }
 }
 

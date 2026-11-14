@@ -1,11 +1,14 @@
 package dev.oumuv.budlog.baby;
 
-import org.springframework.data.jpa.repository.JpaRepository;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import dev.oumuv.budlog.common.RecordMapper;
+import org.apache.ibatis.annotations.Mapper;
 
 import java.util.Optional;
 
-public interface BabyRepository extends JpaRepository<BabyProfile, Long> {
-
-    Optional<BabyProfile> findFirstByOrderByIdAsc();
+@Mapper
+public interface BabyRepository extends RecordMapper<BabyProfile> {
+    default Optional<BabyProfile> findFirstByOrderByIdAsc() {
+        return Optional.ofNullable(selectOne(new QueryWrapper<BabyProfile>().orderByAsc("id").last("LIMIT 1")));
+    }
 }
-

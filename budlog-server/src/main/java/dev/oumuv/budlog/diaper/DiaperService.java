@@ -5,9 +5,9 @@ import dev.oumuv.budlog.baby.BabyService;
 import dev.oumuv.budlog.common.BusinessException;
 import dev.oumuv.budlog.common.PageResponse;
 import dev.oumuv.budlog.common.TimeService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import dev.oumuv.budlog.common.RecordPage;
+import dev.oumuv.budlog.common.PageSpec;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,8 +33,8 @@ public class DiaperService {
     public PageResponse<DiaperResponse> list(OffsetDateTime from, OffsetDateTime to, int page, int size) {
         BabyProfile baby = babyService.requireCurrent();
         validateRangeAndPage(from, to, page, size);
-        Pageable pageable = PageRequest.of(page, Math.min(size, 100));
-        Page<DiaperRecord> records;
+        PageSpec pageable = PageSpec.of(page, Math.min(size, 100));
+        RecordPage<DiaperRecord> records;
         if (from != null && to != null) {
             records = repository.findAllByBabyIdAndDeletedAtIsNullAndRecordTimeGreaterThanEqualAndRecordTimeLessThanOrderByRecordTimeDesc(
                     baby.getId(), from, to, pageable);
@@ -66,7 +66,7 @@ public class DiaperService {
             return toResponse(duplicate);
         }
         DiaperRecord record = new DiaperRecord();
-        record.setBaby(babyService.requireCurrent());
+        record.setBabyId(babyService.requireCurrent().getId());
         record.setClientRequestId(request.getClientRequestId());
         apply(record, request);
         return toResponse(repository.save(record));

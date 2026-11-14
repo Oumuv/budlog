@@ -6,9 +6,9 @@ import dev.oumuv.budlog.common.BusinessException;
 import dev.oumuv.budlog.common.PageResponse;
 import dev.oumuv.budlog.common.TimeService;
 import dev.oumuv.budlog.setting.SettingService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import dev.oumuv.budlog.common.RecordPage;
+import dev.oumuv.budlog.common.PageSpec;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,8 +42,8 @@ public class FeedingService {
     public PageResponse<FeedingResponse> list(OffsetDateTime from, OffsetDateTime to, int page, int size) {
         BabyProfile baby = babyService.requireCurrent();
         validateRangeAndPage(from, to, page, size);
-        Pageable pageable = PageRequest.of(page, Math.min(size, 100));
-        Page<FeedingRecord> records;
+        PageSpec pageable = PageSpec.of(page, Math.min(size, 100));
+        RecordPage<FeedingRecord> records;
         if (from != null && to != null) {
             records = repository.findAllByBabyIdAndDeletedAtIsNullAndStartTimeGreaterThanEqualAndStartTimeLessThanOrderByStartTimeDesc(
                     baby.getId(), from, to, pageable);
@@ -57,8 +57,24 @@ public class FeedingService {
             records = repository.findAllByBabyIdAndDeletedAtIsNullOrderByStartTimeDesc(baby.getId(), pageable);
         }
         List<FeedingResponse> content = new ArrayList<FeedingResponse>();
-        for (FeedingRecord record : records.getContent()) {
-            content.add(toResponse(record));
+        List<FeedingRecord> pageRecords = records.getContent();
+        int defaultInterval = settingService.requireSetting().getDefaultFeedingIntervalMin();
+        int groupStart = 0;
+        while (groupStart < pageRecords.size()) {
+            int groupEnd = groupStart + 1;
+            OffsetDateTime groupTime = pageRecords.get(groupStart).getStartTime();
+            while (groupEnd < pageRecords.size() && pageRecords.get(groupEnd).getStartTime().isEqual(groupTime)) {
+                groupEnd++;
+            }
+            FeedingRecord previous = groupEnd < pageRecords.size()
+                    ? pageRecords.get(groupEnd)
+                    : latestBefore(baby.getId(), groupTime);
+            Long interval = previous == null ? null
+                    : Math.max(0, Duration.between(previous.getStartTime(), groupTime).toMinutes());
+            for (int index = groupStart; index < groupEnd; index++) {
+                content.add(toResponse(pageRecords.get(index), interval, defaultInterval));
+            }
+            groupStart = groupEnd;
         }
         return PageResponse.from(records, content);
     }
@@ -86,7 +102,7 @@ public class FeedingService {
         }
 
         FeedingRecord record = new FeedingRecord();
-        record.setBaby(babyService.requireCurrent());
+        record.setBabyId(babyService.requireCurrent().getId());
         record.setClientRequestId(request.getClientRequestId());
         apply(record, request);
         return toResponse(repository.save(record));
@@ -126,16 +142,18 @@ public class FeedingService {
     public FeedingResponse toResponse(FeedingRecord record) {
         FeedingRecord previous = repository
                 .findFirstByBabyIdAndDeletedAtIsNullAndStartTimeLessThanOrderByStartTimeDesc(
-                        record.getBaby().getId(), record.getStartTime())
+                        record.getBabyId(), record.getStartTime())
                 .orElse(null);
-        Long duration = record.getEndTime() == null
-                ? null
-                : Math.max(0, Duration.between(record.getStartTime(), record.getEndTime()).toMinutes());
         Long interval = previous == null
                 ? null
                 : Math.max(0, Duration.between(previous.getStartTime(), record.getStartTime()).toMinutes());
-        int defaultInterval = settingService.requireSetting().getDefaultFeedingIntervalMin();
+        return toResponse(record, interval, settingService.requireSetting().getDefaultFeedingIntervalMin());
+    }
 
+    private FeedingResponse toResponse(FeedingRecord record, Long interval, int defaultInterval) {
+        Long duration = record.getEndTime() == null
+                ? null
+                : Math.max(0, Duration.between(record.getStartTime(), record.getEndTime()).toMinutes());
         return FeedingResponse.builder()
                 .id(record.getId())
                 .clientRequestId(record.getClientRequestId())

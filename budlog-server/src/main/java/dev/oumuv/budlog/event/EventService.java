@@ -5,9 +5,9 @@ import dev.oumuv.budlog.baby.BabyService;
 import dev.oumuv.budlog.common.BusinessException;
 import dev.oumuv.budlog.common.PageResponse;
 import dev.oumuv.budlog.common.TimeService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import dev.oumuv.budlog.common.RecordPage;
+import dev.oumuv.budlog.common.PageSpec;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,8 +32,8 @@ public class EventService {
     public PageResponse<EventResponse> list(OffsetDateTime from, OffsetDateTime to, int page, int size) {
         BabyProfile baby = babyService.requireCurrent();
         validateRangeAndPage(from, to, page, size);
-        Pageable pageable = PageRequest.of(page, Math.min(size, 100));
-        Page<EventRecord> records;
+        PageSpec pageable = PageSpec.of(page, Math.min(size, 100));
+        RecordPage<EventRecord> records;
         if (from != null && to != null) {
             records = repository.findAllByBabyIdAndDeletedAtIsNullAndOccurredAtGreaterThanEqualAndOccurredAtLessThanOrderByOccurredAtDesc(
                     baby.getId(), from, to, pageable);
@@ -66,7 +66,7 @@ public class EventService {
         }
         BabyProfile baby = babyService.requireCurrent();
         EventRecord record = new EventRecord();
-        record.setBaby(baby);
+        record.setBabyId(baby.getId());
         record.setClientRequestId(request.getClientRequestId());
         apply(record, request, baby);
         return toResponse(repository.save(record));
@@ -75,7 +75,7 @@ public class EventService {
     @Transactional
     public EventResponse update(Long id, EventRequest request) {
         EventRecord record = require(id);
-        apply(record, request, record.getBaby());
+        apply(record, request, babyService.requireCurrent());
         return toResponse(repository.save(record));
     }
 
