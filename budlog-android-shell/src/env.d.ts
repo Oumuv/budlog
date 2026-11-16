@@ -9,6 +9,7 @@ interface ImportMeta {
 }
 
 declare const __BUDLOG_SHELL_VERSION__: string;
+declare const __BUDLOG_SHELL_VERSION_CODE__: number;
 
 interface PlusGlobalEvent {
   addEventListener(event: "newintent", listener: () => void): void;

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, ref } from "vue";
-import { onBackPress, onReady, onUnload } from "@dcloudio/uni-app";
+import { onBackPress, onReady, onShow, onUnload } from "@dcloudio/uni-app";
 import { BRIDGE_VERSION, parseHttpsUrl, resolveShellEnvironment } from "@/config/environment";
+import { checkForAndroidUpdate } from "@/utils/android-release";
 import {
   consumeShortcutRoute,
   dispatchNative,
@@ -183,6 +184,11 @@ function initializeNativeIntegration(): void {
   } catch {
     nativeInitialized = false;
   }
+}
+
+function checkAndroidRelease(): void {
+  if (!environmentResult.ok) return;
+  void checkForAndroidUpdate({ allowedOrigin: environmentResult.value.allowedOrigin });
 }
 
 function unmountRemoteWebview(): void {
@@ -448,8 +454,13 @@ function handleBackPress(): void {
   }
 }
 
+onShow(() => {
+  checkAndroidRelease();
+});
+
 onReady(() => {
   initializeNativeIntegration();
+  checkAndroidRelease();
   plus.globalEvent.addEventListener("newintent", consumeNativeShortcut);
   uni.onNetworkStatusChange(handleNetworkStatusChange);
   void startShell();
