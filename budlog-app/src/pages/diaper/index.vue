@@ -31,6 +31,7 @@ const recordTypeOptions = [
   { value: "POOP", label: "便便" },
   { value: "BOTH", label: "尿便都有" },
 ];
+const diaperNoteQuickOptions = ["中量", "少量", "多量", "黄色", "黄稀", "黏糊"];
 const recordTypeLabel = computed(() => {
   if (form.recordType === "PEE") return "尿尿";
   if (form.recordType === "POOP") return "便便";
@@ -137,7 +138,7 @@ function remove() {
         <text class="field__label">发生时间</text>
         <DateTimeField v-model="form.recordTime" title="选择发生时间" quick-record :max-now-offset-minutes="5" />
       </view>
-      <OptionalNoteField v-model="form.note" />
+      <OptionalNoteField v-model="form.note" :quick-options="diaperNoteQuickOptions" />
       <view class="form-actions">
         <NButton v-if="recordId" type="error" size="large" secondary block @click="remove"><Trash2 :size="18" />删除</NButton>
         <NButton type="primary" size="large" block :loading="saving" @click="save"><Save :size="18" />{{ saving ? "保存中" : recordId ? "保存修改" : `记录${recordTypeLabel}` }}</NButton>

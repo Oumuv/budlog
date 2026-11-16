@@ -7,6 +7,8 @@ services:
       context: .
       dockerfile: server.Dockerfile
     restart: unless-stopped
+    mem_limit: 640m
+    memswap_limit: 640m
     # Optional, separate Agent config: enabled flag and hashed client digests only.
     env_file:
       - path: ../.agent.env
@@ -42,7 +44,7 @@ services:
       WHITE_NOISE_ROOT_DIRECTORY: /data/white-noise
       CORS_ALLOWED_ORIGINS: "${BUDLOG_CORS_ALLOWED_ORIGINS:-http://localhost:${BUDLOG_PROD_WEB_PORT:-5173},http://127.0.0.1:${BUDLOG_PROD_WEB_PORT:-5173}}"
 
-      JAVA_TOOL_OPTIONS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx256m -XX:+UseSerialGC -Dfile.encoding=UTF-8
       TZ: ${BUDLOG_TIMEZONE:-Asia/Shanghai}
 
     healthcheck:

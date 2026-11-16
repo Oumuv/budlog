@@ -2,8 +2,8 @@
     "name" : "Budlog",
     "appid" : "__UNI__A5107DE",
     "description" : "Budlog Android H5 shell",
-    "versionName" : "1.1.1",
-    "versionCode" : 108,
+    "versionName" : "1.2.0",
+    "versionCode" : 109,
     "transformPx" : false,
     "app-plus" : {
         "usingComponents" : true,
@@ -26,7 +26,8 @@
                     "<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\"/>",
                     "<uses-permission android:name=\"android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK\"/>",
                     "<uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\"/>",
-                    "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>"
+                    "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>",
+                    "<uses-permission android:name=\"android.permission.REQUEST_INSTALL_PACKAGES\"/>"
                 ]
             },
             "sdkConfigs" : {},

@@ -7,6 +7,7 @@ interface PackageMetadata {
 }
 
 interface ManifestMetadata {
+  versionCode: number;
   versionName: string;
 }
 
@@ -19,6 +20,11 @@ const manifestMetadata = JSON.parse(
 
 if (manifestMetadata.versionName !== packageMetadata.version) {
   throw new Error("package.json version must match manifest.json versionName.");
+}
+
+const { versionCode } = manifestMetadata;
+if (!Number.isInteger(versionCode) || versionCode <= 0) {
+  throw new Error("manifest.json versionCode must be a positive integer.");
 }
 
 function validateProductionUrl(rawUrl: string | undefined): void {
@@ -56,6 +62,7 @@ export default defineConfig(({ command, mode }) => {
     plugins: [uni()],
     define: {
       __BUDLOG_SHELL_VERSION__: JSON.stringify(packageMetadata.version),
+      __BUDLOG_SHELL_VERSION_CODE__: JSON.stringify(versionCode),
     },
   };
 });
